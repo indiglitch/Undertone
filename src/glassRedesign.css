@@ -800,7 +800,6 @@ input[type="range"]::-moz-range-thumb { width: 9px; height: 9px; border: 2px sol
   .player .player-output { display: none; }
   .player .transport-buttons { justify-content: flex-end; }
   .player .seek { gap: 4px; }
-  .player-control-volume, .player-control-trash, .player-control-autoplay { display: none; }
   .lyrics-screen > header { padding: 18px 18px 10px; }
   .lyrics-scroll { padding: 18vh 18px 24vh; }
   .lyrics-indexer { margin: 16px 12px; padding: 14px; }
@@ -1293,7 +1292,7 @@ input[type="range"]::-webkit-slider-thumb, input[type="range"]::-moz-range-thumb
 .player-track-actions .tooltip-anchor { flex: 0 0 auto; }
 .player-track-actions .icon-button { width: 34px; height: 34px; min-height: 34px; }
 .player .transport { grid-column: 2; width: 100%; max-width: 860px; justify-self: center; }
-.player .player-control-strip { width: 100%; justify-content: center; gap: 4px; }
+.player .player-control-strip { width: 100%; justify-content: safe center; gap: 4px; }
 .player .player-control-strip.is-locked { cursor: default; }
 .player-layout-lock { width: 31px; height: 31px; min-height: 31px; flex: 0 0 31px; color: var(--text-muted); }
 .player-layout-lock.is-locked { color: var(--accent-violet); background: color-mix(in srgb, var(--accent-violet) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-violet) 24%, transparent); }
@@ -1420,7 +1419,7 @@ input[type="range"]::-webkit-slider-thumb, input[type="range"]::-moz-range-thumb
   .player .now-playing { gap: 7px; }
   .player .now-playing .cover { width: 38px; height: 38px; min-width: 38px; flex-basis: 38px; }
   .player-track-actions .icon-button { width: 28px; height: 28px; min-height: 28px; }
-  .player .player-control-strip { justify-content: flex-end; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+  .player .player-control-strip { justify-content: flex-start; gap: 2px; overflow-x: auto; scrollbar-width: none; }
   .player .player-control-strip::-webkit-scrollbar { display: none; }
   .player-layout-lock { width: 26px; height: 26px; min-height: 26px; flex-basis: 26px; }
   .lyrics-management { width: calc(100% - 24px); }

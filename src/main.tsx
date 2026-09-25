@@ -8,4 +8,5 @@ import './playerControlLayout.css';
 import './playerPolish.css';
 import './settingsPolish.css';
 import './glassRedesign.css';
+import './playerFreeLayout.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

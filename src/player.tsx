@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ListMusic, Shuffle, Repeat2, Radio, MicVocal, Heart, Trash2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, ListMusic, Shuffle, Repeat2, Radio, MicVocal, Heart, Trash2, LockKeyhole, LockKeyholeOpen } from 'lucide-react';
 import { AudioStatus, PlaybackSession, Track, time } from './types';
 import { Cover } from './ui';
 import { moveItem } from './libraryModel';
@@ -14,7 +14,7 @@ import { volumeAction, volumeFromWheel, volumePercent } from './playerVolumeMode
 import './playerResponsive.css';
 import {MusicVisualizer} from './MusicVisualizer';
 import PlayerControlStrip from './PlayerControlStrip';
-import type {PlayerControlId} from './playerControlLayout';
+import type {PlayerControlId,PlayerControlPositions} from './playerControlLayout';
 
 export type QueueEntry={key:number;track:Track};
 export type PlayContext={kind:'playlist';playlistId:number};
@@ -161,24 +161,30 @@ export function usePlayer(report:(error:unknown)=>void,onStarted?:()=>void,local
   return {status,current,busy,play,next,toggle,primaryPlay,command,changeVolume,queue,enqueue,jump,remove,move,clearUpcoming,removeDeletedTrack,modes,context,toggleShuffle,changeRepeat,toggleAutoplay,canNext:nextDecision.kind!=='stop',canPrimaryPlay:primaryDecision.kind!=='nothing'};
 }
 export type PlayerModel=ReturnType<typeof usePlayer>;
-export default function Player({player,onDetails,onQueue,onLyrics,onVisualizer,visualizerOpen,lyricsOpen,lyricsAvailable,liked,onToggleLike,onTrackContextMenu,onMoveToTrash,trashAvailable,controlOrder,onControlOrderChange}:{player:PlayerModel;onDetails:()=>void;onQueue:()=>void;onLyrics:()=>void;onVisualizer:()=>void;visualizerOpen:boolean;lyricsOpen:boolean;lyricsAvailable:boolean;liked:boolean;onToggleLike:()=>void;onTrackContextMenu:(track:Track,point:{x:number;y:number})=>void;onMoveToTrash:(track:Track)=>void;trashAvailable:boolean;controlOrder:PlayerControlId[];onControlOrderChange:(order:PlayerControlId[])=>void}) {
+export default function Player({player,onDetails,onQueue,onLyrics,onVisualizer,visualizerOpen,lyricsOpen,lyricsAvailable,liked,onToggleLike,onTrackContextMenu,onMoveToTrash,trashAvailable,controlOrder,controlPositions,onControlPositionsChange}:{player:PlayerModel;onDetails:()=>void;onQueue:()=>void;onLyrics:()=>void;onVisualizer:()=>void;visualizerOpen:boolean;lyricsOpen:boolean;lyricsAvailable:boolean;liked:boolean;onToggleLike:()=>void;onTrackContextMenu:(track:Track,point:{x:number;y:number})=>void;onMoveToTrash:(track:Track)=>void;trashAvailable:boolean;controlOrder:PlayerControlId[];controlPositions:PlayerControlPositions;onControlPositionsChange:(positions:PlayerControlPositions)=>void}) {
   const {status,current,busy}=player;
   const [seek,setSeek]=useState<number|null>(null);
-  const [controlsLocked,setControlsLocked]=useState(()=>{try{return localStorage.getItem('undertone.player.controls.locked')!=='false';}catch{return true;}});
+  const [controlsLocked,setControlsLocked]=useState(()=>{try{return localStorage.getItem('undertone.player.controls.locked.v2')==='true';}catch{return false;}});
+  const [compactPlayer,setCompactPlayer]=useState(()=>typeof window!=='undefined'&&window.matchMedia('(max-width: 760px)').matches);
   const [displayVolume,setDisplayVolume]=useState(status.volume);
   const previousVolume=useRef(0.65),volumeDragging=useRef(false);
+  useEffect(()=>{
+    const query=window.matchMedia('(max-width: 760px)'),update=()=>setCompactPlayer(query.matches);
+    update();query.addEventListener('change',update);return()=>query.removeEventListener('change',update);
+  },[]);
   useEffect(()=>{if(!volumeDragging.current)setDisplayVolume(status.volume);},[status.volume]);
   const repeatLabel={off:'Повтор выключен',track:'Повтор трека',queue:'Повтор очереди',playlist:'Повтор плейлиста'}[player.modes.repeatMode];
   const repeatBadge={off:'',track:'1',queue:'Q',playlist:'P'}[player.modes.repeatMode];
   const volumeRangeStyle={'--range-progress':`${Math.round(displayVolume*100)}%`} as CSSProperties;
   const seekValue=seek??Math.min(status.position,status.duration);
   const seekRangeStyle={'--range-progress':`${status.duration?Math.max(0,Math.min(100,seekValue/status.duration*100)):0}%`} as CSSProperties;
-  const setControlsLock=()=>{const next=!controlsLocked;setControlsLocked(next);try{localStorage.setItem('undertone.player.controls.locked',String(next));}catch{/* Storage can be unavailable. */}};
+  const setControlsLock=()=>{const next=!controlsLocked;setControlsLocked(next);try{localStorage.setItem('undertone.player.controls.locked.v2',String(next));}catch{/* Storage can be unavailable. */}};
   const controls:Record<PlayerControlId,ReactNode>={
+    layoutLock:<Tooltip content={controlsLocked?'Разблокировать расположение кнопок':'Закрепить расположение кнопок'}><button className={`icon-button player-layout-lock${controlsLocked?' is-locked':''}`} type="button" aria-label={controlsLocked?'Разблокировать расположение кнопок':'Закрепить расположение кнопок'} aria-pressed={controlsLocked} onClick={setControlsLock}>{controlsLocked?<LockKeyhole size={15}/>:<LockKeyholeOpen size={15}/>}</button></Tooltip>,
     shuffle:<Tooltip content={player.modes.shuffle?'Выключить перемешивание':'Перемешать'}><button className={`icon-button ${player.modes.shuffle?'mode-active':''}`} aria-label={player.modes.shuffle?'Выключить перемешивание':'Включить перемешивание'} disabled={!current||busy} onClick={player.toggleShuffle}><Shuffle size={17}/></button></Tooltip>,
-    previous:<Tooltip content="Предыдущий трек"><button className="icon-button" aria-label="Предыдущий трек" disabled={!current||busy} onClick={()=>status.position>3?void player.command({type:'seek',seconds:0}):void player.next(-1)}><SkipBack size={19} fill="currentColor"/></button></Tooltip>,
-    play:<Tooltip content={status.playing?'Пауза':'Воспроизвести'}><button className="play-toggle" aria-label={status.playing?'Пауза':'Воспроизвести'} disabled={busy||!player.canPrimaryPlay} onClick={()=>void player.primaryPlay()}>{status.playing?<Pause size={20} fill="currentColor"/>:<Play size={20} fill="currentColor"/>}</button></Tooltip>,
-    next:<Tooltip content="Следующий трек"><button className="icon-button" aria-label="Следующий трек" disabled={!current||busy||!player.canNext} onClick={()=>void player.next(1)}><SkipForward size={19} fill="currentColor"/></button></Tooltip>,
+    previous:<Tooltip content="Предыдущий трек"><button className="icon-button" aria-label="Предыдущий трек" disabled={!current||busy} onClick={()=>status.position>3?void player.command({type:'seek',seconds:0}):void player.next(-1)}><SkipBack size={29} fill="currentColor"/></button></Tooltip>,
+    play:<Tooltip content={status.playing?'Пауза':'Воспроизвести'}><button className="play-toggle" aria-label={status.playing?'Пауза':'Воспроизвести'} disabled={busy||!player.canPrimaryPlay} onClick={()=>void player.primaryPlay()}>{status.playing?<Pause size={30} fill="currentColor"/>:<Play size={30} fill="currentColor"/>}</button></Tooltip>,
+    next:<Tooltip content="Следующий трек"><button className="icon-button" aria-label="Следующий трек" disabled={!current||busy||!player.canNext} onClick={()=>void player.next(1)}><SkipForward size={29} fill="currentColor"/></button></Tooltip>,
     repeat:<Tooltip content={`${repeatLabel}. Нажмите, чтобы изменить режим`}><button className={`icon-button repeat-mode ${player.modes.repeatMode!=='off'?'mode-active':''}`} aria-label={repeatLabel} disabled={!current||busy} onClick={player.changeRepeat}><Repeat2 size={17}/>{repeatBadge&&<small>{repeatBadge}</small>}</button></Tooltip>,
     like:<Tooltip content={liked?'Убрать из любимых':'Добавить в любимые'}><button className={`icon-button player-like ${liked?'liked':''}`} aria-pressed={liked} aria-label={liked?'Убрать из любимых':'Добавить в любимые'} disabled={!current||busy} onClick={onToggleLike}><Heart size={18} fill={liked?'currentColor':'none'}/></button></Tooltip>,
     trash:<Tooltip content={trashAvailable?'Переместить в удалённые':'Выберите папку удалённых песен в настройках'}><button className="icon-button player-trash" aria-label="Переместить в удалённые" disabled={!current||busy||!trashAvailable} onClick={()=>{if(current)onMoveToTrash(current);}}><Trash2 size={18}/></button></Tooltip>,
@@ -192,6 +198,7 @@ export default function Player({player,onDetails,onQueue,onLyrics,onVisualizer,v
       <output className="volume-readout" aria-label="Текущая громкость" aria-live="polite">{volumePercent(displayVolume)}</output>
     </div>,
   };
+  const visibleControlOrder=compactPlayer?controlOrder:controlOrder.filter(id=>id!=='volume');
   return <footer className="player">
     <div className="player-left">
       <div className="player-track-group">
@@ -199,16 +206,15 @@ export default function Player({player,onDetails,onQueue,onLyrics,onVisualizer,v
           <Cover track={current} size="small"/>
           <span><strong>{current?.title||'Музыка начинается с вас'}</strong><small>{current?.artist||'Выберите трек из библиотеки'}</small></span>
         </button>
-        <div className="player-track-actions" aria-label="Действия с текущим треком">{controls.like}{controls.trash}</div>
       </div>
     </div>
     <div className="transport">
-      <PlayerControlStrip order={controlOrder} excluded={['volume','like','trash']} controls={controls} onOrderChange={onControlOrderChange} locked={controlsLocked} onToggleLocked={setControlsLock}/>
+      <PlayerControlStrip order={visibleControlOrder} positions={controlPositions} controls={controls} onPositionsChange={onControlPositionsChange} locked={controlsLocked}/>
       <div className="seek"><span>{time(seekValue)}</span><input aria-label="Позиция воспроизведения" type="range" min="0" max={status.duration||1} step="0.1" value={seekValue} style={seekRangeStyle} disabled={!current||busy} onChange={e=>setSeek(+e.target.value)} onPointerUp={e=>{void player.command({type:'seek',seconds:+e.currentTarget.value});setSeek(null);}} onKeyUp={e=>{if(e.key.startsWith('Arrow')||['Home','End','PageUp','PageDown'].includes(e.key)){void player.command({type:'seek',seconds:+e.currentTarget.value});setSeek(null);}}} onBlur={()=>setSeek(null)}/><span>{time(status.duration)}</span></div>
     </div>
     <div className="player-output">
       {current&&<span className="format player-format">{current.format}</span>}
-      <div className="player-volume-dock player-control-item player-control-volume">{controls.volume}</div>
+      <div className="player-volume-dock">{controls.volume}</div>
     </div>
   </footer>;
 }

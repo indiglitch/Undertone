@@ -20,7 +20,7 @@ import { detailsLayoutClass, likeAction, setLiked, stableRandomAlbumIds } from '
 import { downloadPageEntries, enterSearch, goBack, groupedSidebarOrder, homeCopy, initialNavigation, loadSidebarOrder, recentlyAddedTracks, reorderSidebar, rescanConfiguredFolders, saveSidebarOrder, searchScreen, sidebarGroup, sidebarGroups, visit, type NavigationPage, type SidebarId } from './navigationModel';
 import MoveTrackDialog from './MoveTrackDialog';
 import TrackMetadataDialog from './TrackMetadataDialog';
-import {loadPlayerControlOrder,resetPlayerControlOrder,savePlayerControlOrder,type PlayerControlId} from './playerControlLayout';
+import {loadPlayerControlOrder,loadPlayerControlPositions,resetPlayerControlOrder,resetPlayerControlPositions,savePlayerControlPositions,type PlayerControlId,type PlayerControlPositions} from './playerControlLayout';
 import ResizeHandle from './ResizeHandle';
 import { useResizableLayout } from './useResizableLayout';
 import { Tooltip } from './Tooltip';
@@ -49,8 +49,9 @@ export default function App() {
   const {page,query}=navigation.current;
   const [sidebarOrder,setSidebarOrder]=useState(()=>loadSidebarOrder(typeof localStorage==='undefined'?null:localStorage));
   const [playerControlOrder,setPlayerControlOrder]=useState(()=>loadPlayerControlOrder(typeof localStorage==='undefined'?null:localStorage));
-  function updatePlayerControlOrder(order:PlayerControlId[]){setPlayerControlOrder(order);savePlayerControlOrder(typeof localStorage==='undefined'?null:localStorage,order);}
-  function resetPlayerLayout(){setPlayerControlOrder(resetPlayerControlOrder(typeof localStorage==='undefined'?null:localStorage));}
+  const [playerControlPositions,setPlayerControlPositions]=useState(()=>loadPlayerControlPositions(typeof localStorage==='undefined'?null:localStorage));
+  function updatePlayerControlPositions(positions:PlayerControlPositions){setPlayerControlPositions(positions);savePlayerControlPositions(typeof localStorage==='undefined'?null:localStorage,positions);}
+  function resetPlayerLayout(){const storage=typeof localStorage==='undefined'?null:localStorage;setPlayerControlOrder(resetPlayerControlOrder(storage));setPlayerControlPositions(resetPlayerControlPositions(storage));}
   const sidebarDrag=useRef<{id:SidebarId;pointerId:number;x:number;y:number;moved:boolean}|null>(null),suppressNavClick=useRef(false);
   const [sidebarMenu,setSidebarMenu]=useState<({kind:'nav';id:SidebarId}|{kind:'playlist';id:number}|{kind:'source';folder:string})&{point:{x:number;y:number}}|null>(null);
   const [sidebarPlaylistEditor,setSidebarPlaylistEditor]=useState<Playlist|null>(null);
@@ -289,7 +290,7 @@ export default function App() {
       {visualizerOpen&&<FullVisualizer track={player.current} playing={player.status.playing} onClose={back}/>} 
     </main>
     <ResizeHandle axis="vertical" label="Изменить высоту плеера" className="player-resize" {...resizableLayout.handle('player')}/>
-    <Player player={player} onDetails={()=>setDetails(v=>!v)} onQueue={()=>navigate({kind:"queue"})} onLyrics={toggleLyrics} onVisualizer={toggleVisualizer} visualizerOpen={visualizerOpen} lyricsOpen={lyricsOpen} lyricsAvailable={currentHasLyrics} liked={currentLiked} onToggleLike={toggleCurrentLike} onTrackContextMenu={(track,point)=>setPlayerTrackMenu({track,point})} onMoveToTrash={requestMoveToTrash} trashAvailable={!!deletedSongsFolder} controlOrder={playerControlOrder} onControlOrderChange={updatePlayerControlOrder}/>
+    <Player key="player-controls-layout-v3" player={player} onDetails={()=>setDetails(v=>!v)} onQueue={()=>navigate({kind:"queue"})} onLyrics={toggleLyrics} onVisualizer={toggleVisualizer} visualizerOpen={visualizerOpen} lyricsOpen={lyricsOpen} lyricsAvailable={currentHasLyrics} liked={currentLiked} onToggleLike={toggleCurrentLike} onTrackContextMenu={(track,point)=>setPlayerTrackMenu({track,point})} onMoveToTrash={requestMoveToTrash} trashAvailable={!!deletedSongsFolder} controlOrder={playerControlOrder} controlPositions={playerControlPositions} onControlPositionsChange={updatePlayerControlPositions}/>
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
     {sidebarMenu?.kind==='nav'&&<ContextMenu point={sidebarMenu.point} label={`Действия: ${navTooltips[sidebarMenu.id]}`} onClose={()=>setSidebarMenu(null)} onNotice={setToast}>{run=><><MenuSection><MenuItem icon={<ArrowRight size={16}/>} onClick={()=>void run(navItems[sidebarMenu.id].action)}>Открыть</MenuItem></MenuSection>
       {['library','recentlyAdded','history','liked','queue'].includes(sidebarMenu.id)&&<MenuSection><MenuItem icon={<Play size={16}/>} disabled={!sidebarQuickTracks.length||player.busy} onClick={()=>void run(()=>sidebarMenu.id==='queue'?player.jump(player.queue.cursor+1):player.play(sidebarQuickTracks[0],sidebarQuickTracks))}>Воспроизвести список</MenuItem>{sidebarMenu.id!=='queue'&&<MenuItem icon={<ListMusic size={16}/>} disabled={!sidebarQuickTracks.length||player.busy} onClick={()=>void run(()=>enqueueGroup(sidebarQuickTracks,false,player.enqueue),'Добавлено в очередь')}>Добавить список в очередь</MenuItem>}</MenuSection>}
