@@ -268,13 +268,6 @@ export default function App() {
       {library.folders.map(folder=><button className="source" key={folder} title={folder} onClick={()=>setFoldersOpen(true)} onContextMenu={event=>openContextMenu(event,point=>setSidebarMenu({kind:'source',folder,point}))}><Folder size={19}/><span>{folder.split(/[\\/]/).filter(Boolean).at(-1)}<small>Локальная папка</small></span><span className="status-dot"/></button>)}
       {!library.folders.length&&<button className="source" onClick={()=>setFoldersOpen(true)} onContextMenu={event=>openContextMenu(event,point=>setSidebarMenu({kind:'source',folder:'',point}))}><FolderPlus size={19}/><span>Добавить музыку</span></button>}
       </div>
-      <div className="offline-status" aria-label="Локальный плеер, версия 0.2.1" title="Версия 0.2.1">
-        <span className="offline-status-icon" aria-hidden="true"><AudioLines size={17}/></span>
-        <span className="offline-status-copy">
-          <strong className="offline-status-label">Локальный плеер</strong>
-          <span className="offline-status-version"><span className="status-dot"/>Версия 0.2.1</span>
-        </span>
-      </div>
     </aside>
     <ResizeHandle axis="horizontal" label="Изменить ширину боковой панели" className="sidebar-resize" {...resizableLayout.handle('left')}/>
     <main>
