@@ -5,7 +5,7 @@ import './Tooltip.css';
 
 export function Tooltip({content,children,delay=420,className=''}:{content:ReactNode;children:ReactElement;delay?:number;className?:string}){
   const anchorRef=useRef<HTMLSpanElement>(null),tipRef=useRef<HTMLDivElement>(null),timer=useRef<number|null>(null);
-  const hovered=useRef(false),focused=useRef(false);
+  const hovered=useRef(false),focused=useRef(false),pointerFocusCandidate=useRef(false),focusedByPointer=useRef(false);
   const [open,setOpen]=useState(false),[point,setPoint]=useState({left:0,top:0,ready:false});
   const id=useId();
   const clear=()=>{if(timer.current!==null){window.clearTimeout(timer.current);timer.current=null;}};
@@ -33,10 +33,13 @@ export function Tooltip({content,children,delay=420,className=''}:{content:React
 
   const child=isValidElement(children)?cloneElement(children as ReactElement<Record<string,unknown>>,{['aria-describedby']:open?id:undefined}):children;
   return <span ref={anchorRef} className={`tooltip-anchor ${className}`.trim()}
+    onPointerDown={()=>{pointerFocusCandidate.current=true;}}
+    onPointerUp={()=>{pointerFocusCandidate.current=false;}}
+    onPointerCancel={()=>{pointerFocusCandidate.current=false;}}
     onPointerEnter={()=>{hovered.current=true;schedule();}}
-    onPointerLeave={()=>{hovered.current=false;reconcile();}}
-    onFocusCapture={()=>{focused.current=true;schedule();}}
-    onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node)){focused.current=false;reconcile();}}}>
+    onPointerLeave={()=>{hovered.current=false;if(focusedByPointer.current){focused.current=false;focusedByPointer.current=false;}reconcile();}}
+    onFocusCapture={()=>{focused.current=true;if(pointerFocusCandidate.current){focusedByPointer.current=true;pointerFocusCandidate.current=false;}schedule();}}
+    onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node)){focused.current=false;focusedByPointer.current=false;pointerFocusCandidate.current=false;reconcile();}}}>
     {child}
     {open&&createPortal(<div ref={tipRef} id={id} role="tooltip" className="undertone-tooltip" style={{left:point.left,top:point.top,visibility:point.ready?'visible':'hidden'}}>{content}</div>,document.body)}
   </span>;
