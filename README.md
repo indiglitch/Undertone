@@ -19,7 +19,7 @@ npm run package
 
 ## GitHub releases and in-app updates
 
-The source repository is [nckkoo/Undertone](https://github.com/nckkoo/Undertone). In Undertone, open **Настройки → Обновление приложения → Проверить обновления** to check the latest published Windows release and install it.
+The source repository is [indiglitch/Undertone](https://github.com/indiglitch/Undertone). In Undertone, open **Настройки → Обновление приложения → Проверить обновления** to check the latest published Windows release and install it.
 
 To publish an update, increase the app version in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`, commit the changes, then push a matching version tag such as `v0.2.3`. The GitHub Actions workflow builds the Windows installer, signs the updater bundle, and publishes the GitHub Release and `latest.json` used by the app.
 
