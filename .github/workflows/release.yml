@@ -35,3 +35,10 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --features slskd,external-lyrics
+      - name: Replace API asset URLs in the updater manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/patch-updater-manifest.ps1 -Repository $env:RELEASE_REPOSITORY -Tag $env:RELEASE_TAG
