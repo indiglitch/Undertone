@@ -1,0 +1,7 @@
+.track-context-menu {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+.context-submenu>summary{display:flex;align-items:center;justify-content:space-between;min-height:40px;padding:8px 10px;border-radius:6px;cursor:pointer;list-style:none}.context-submenu>summary::-webkit-details-marker{display:none}.context-submenu>summary:hover{background:#ffffff0b}.context-submenu[open]>summary svg{transform:rotate(90deg)}.context-submenu>summary svg{transition-property:transform;transition-duration:120ms}.context-submenu>div{padding:3px 0 3px 12px}.context-submenu>div button{color:#bdcbb0}

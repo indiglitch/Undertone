@@ -1,0 +1,23 @@
+.player { grid-template-columns: minmax(140px, 25%) minmax(0, 1fr) auto; gap: 12px; }
+.player .transport { min-width: 0; }
+.player .player-control-strip { display: flex; justify-content: flex-start; align-items: center; gap: 4px; min-width: 0; max-width: 100%; height: 46px; margin: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: pan-x; overscroll-behavior-x: contain; }
+.player .player-control-strip::-webkit-scrollbar { display: none; }
+.player-control-item { position: relative; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-width: 38px; min-height: 40px; border-radius: 8px; user-select: none; }
+.player-control-item:hover { background: #d1e6ad0b; cursor: grab; }
+.player-control-item .tooltip-anchor { display: inline-flex; align-items: center; justify-content: center; }
+.player-control-item button:disabled { pointer-events: none; }
+.player-control-item.is-source { opacity: .38; }
+.player-control-strip.is-dragging, .player-control-strip.is-dragging * { cursor: grabbing!important; user-select: none!important; }
+.player-drop-indicator { position: absolute; top: 3px; bottom: 3px; width: 3px; border-radius: 3px; background: #c8e99e; box-shadow: 0 0 0 3px #c8e99e2a; pointer-events: none; }
+.player-control-item > .player-drop-indicator:first-child { left: -4px; }
+.player-control-item > .player-drop-indicator:last-child { right: -4px; }
+.player-control-visualizer { width: 94px; }
+.player-control-visualizer .visualizer-tooltip { width: 100%; }
+.player-control-visualizer .music-visualizer { width: 100%; }
+.player-control-volume { width: 190px; }
+.player-control-volume .volume-group { padding: 0; }
+.player .player-output { flex: 0 0 auto; min-width: 0; padding-left: 0; }
+.player .seek { min-width: 0; margin-top: 2px; }
+@media (max-width: 1150px) { .player { padding-inline: 15px; gap: 8px; } }
+@media (max-width: 1060px) { .player { grid-template-columns: minmax(130px, 26%) minmax(0, 1fr) auto; } .player-control-visualizer { display: none; } }
+@media (max-width: 900px) { .player { grid-template-columns: minmax(115px, 28%) minmax(0, 1fr) auto; padding-inline: 9px; gap: 5px; } .player-control-trash, .player-control-autoplay { display: none; } .player .player-control-strip { gap: 2px; } }

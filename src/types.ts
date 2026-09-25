@@ -1,0 +1,18 @@
+export type Track = { id:number; path:string; title:string; artist:string; album:string; album_artist:string; artist_id:number;album_id:number;added_at:string; track_number:number|null; year:number|null; duration:number; format:string; cover:string|null; genre:string;has_lyrics:boolean };
+export type Library = { tracks:Track[]; folders:string[]; errors:{path:string;message:string}[] };
+export type Progress = { running:boolean; stage:string; total:number; processed:number; imported:number; skipped:number; errors:number; current:string };
+export type AudioStatus = { id:number|null; playing:boolean; position:number; duration:number; volume:number; ended:boolean; warning?:string|null };
+export type PlaylistEntry={id:number;track_id:number;position:number};
+export type Playlist={id:number;name:string;description:string;entries:PlaylistEntry[]};
+export type HistoryEntry={id:number;track_id:number;played_at:string};
+export type Collections={likes:number[];playlists:Playlist[];history:HistoryEntry[]};
+export type SyncedLyricLine={timestamp_ms:number;text:string;order:number};
+export type LyricsDocument={plain:string|null;synced:SyncedLyricLine[];origin:'manual'|'local_lrc'|'embedded_plain'|'embedded_synced'|{external:string};manually_edited:boolean;revision:string};
+export type ExternalLyricsStatus='found'|'not_found'|'ambiguous'|'temporary_error';
+export type ExternalLyricsResult={status:ExternalLyricsStatus;lyrics:LyricsDocument|null;cached:boolean};
+export type DeletedSongsSettings={folder:string|null};
+export type MoveTrackResult={track_id:number;destination_path:string;destination_filename:string};
+export type TrackFileStatus='present'|'missing';
+export type TrackMetadataDetails={size_bytes:number|null;lyrics_source:string|null};
+export type PlaybackSession={entries:{entry_id:number;track_id:number}[];current_entry_id:number|null;current_track_id:number|null;cursor:number|null;position_seconds:number};
+export const time = (seconds:number) => `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;

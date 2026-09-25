@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import ts from 'typescript';
+const source=await fs.readFile(new URL('../src/libraryModel.ts',import.meta.url),'utf8');
+const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {matchesQuery,localSearchSource,sortTracks,moveItem}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const a={id:11,title:'Ночь 10',artist:'Ёлка',album_artist:'Сборник',album:'Город',genre:'Pop',duration:210,year:2020,added_at:'2020-01-01'};
+const b={...a,id:12,title:'Ночь 2',duration:180,year:2022,added_at:'2022-01-01'};
+assert(matchesQuery(a,'  НОЧЬ   ГОРОД  '));
+assert(matchesQuery(a,'ёлка сборник'));
+assert(!matchesQuery(a,'нет такой песни'));
+assert.deepEqual(sortTracks([a,b],'title').map(t=>t.id),[12,11]);
+assert.deepEqual(sortTracks([a,b],'duration',true).map(t=>t.id),[11,12]);
+assert.deepEqual(sortTracks([a,b],'year',true).map(t=>t.id),[12,11]);
+assert.deepEqual(sortTracks([a,b],'added',true).map(t=>t.id),[12,11]);
+const queue=[{key:1,track:a},{key:2,track:a},{key:3,track:b}];
+assert.deepEqual(moveItem(queue,2,0).map(e=>e.key),[3,1,2]);
+assert.deepEqual(queue.map(e=>e.key),[1,2,3]);
+assert.equal(moveItem(queue,0,99),queue);
+const controller=new AbortController();const local=localSearchSource([a,b]);
+assert.deepEqual((await local.search('ночь',controller.signal)).map(h=>[h.source,h.localTrackId]),[['local',11],['local',12]]);
+controller.abort();assert.deepEqual(await local.search('',controller.signal),[]);
+console.log('PASS local Unicode/token search, source-tagged IDs, numeric/duration/year/added sorting, duplicate queue entry reorder, cancelled search');
+const dragSource=await fs.readFile(new URL('../src/trackDrag.ts',import.meta.url),'utf8');
+const dragCode=ts.transpileModule(dragSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+const {TrackDrag}=await import('data:text/javascript;base64,'+Buffer.from(dragCode).toString('base64'));
+const drag=new TrackDrag();
+drag.begin(11,1,0,0);assert.equal(drag.move(1,3,2),false);assert.equal(drag.finish(1),null);
+drag.begin(11,1,0,0);assert.equal(drag.move(2,100,100),false);assert.equal(drag.finish(2),null);
+assert.equal(drag.move(1,6,0),true);assert.equal(drag.move(1,7,0),false);
+assert.equal(drag.finish(1),11);assert.equal(drag.finish(1),null); // one up -> at most one request
+for(const id of [11,12,11]){drag.begin(id,1,0,0);drag.move(1,20,20);assert.equal(drag.finish(1),id);}
+drag.begin(11,1,0,0);drag.move(1,20,20);drag.cancel();assert.equal(drag.finish(1),null);
+console.log('PASS pointer threshold, pointer ownership, one-shot finish, repeated IDs and cancellation (Escape/pointercancel/lost capture)');

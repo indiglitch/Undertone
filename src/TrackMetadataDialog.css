@@ -1,0 +1,14 @@
+.track-metadata-dialog { width: min(620px, calc(100vw - 28px)); max-height: min(720px, calc(100vh - 28px)); padding: 0; overflow: auto; border: 1px solid #d1e6ad20; border-radius: 13px; background: #1a1e17; color: #e0e8d8; box-shadow: 0 25px 80px #000b; }
+.track-metadata-dialog::backdrop { background: #080a08b8; }
+.track-metadata-body { padding: 23px 26px 20px; }
+.track-metadata-body header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.track-metadata-body header small { color: #8da080; font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+.track-metadata-body h2 { margin-top: 5px; font-size: 22px; font-weight: 550; }
+.track-metadata-body dl { margin: 0; }
+.track-metadata-body dl > div { display: grid; grid-template-columns: minmax(115px, 36%) minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 9px 2px; border-top: 1px solid #d1e6ad12; font-size: 12px; line-height: 1.45; }
+.track-metadata-body dt { color: #8e9d83; }
+.track-metadata-body dd { min-width: 0; margin: 0; color: #d9e3d0; overflow-wrap: anywhere; user-select: text; }
+.track-metadata-body footer { display: flex; justify-content: flex-end; margin-top: 18px; }
+.track-metadata-body footer .subtle-button { min-height: 35px; border-radius: 8px; }
+.track-metadata-error { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; color: #d9ada5; font-size: 12px; }
+@media (max-width: 520px) { .track-metadata-body { padding: 19px; } .track-metadata-body dl > div { grid-template-columns: 105px minmax(0, 1fr); gap: 10px; } }

@@ -1,0 +1,23 @@
+.app-shell { --sidebar-width: 260px; }
+.player {
+  grid-template-columns: minmax(180px, 1fr) minmax(0, 900px) minmax(52px, 1fr);
+  column-gap: 16px;
+  padding-inline: 22px;
+}
+.player .now-playing { max-width: 350px; }
+.player .transport { width: 100%; max-width: 900px; justify-self: center; }
+.player .player-control-strip { width: 100%; justify-content: safe center; }
+.player .seek { width: min(100%, 820px); margin: 4px auto 0; gap: 12px; }
+.player .seek input[type=range] { min-width: 0; }
+.player .seek span { flex: 0 0 34px; font-variant-numeric: tabular-nums; }
+.player .player-output { justify-self: end; }
+@media (max-width: 1100px) {
+  .player { grid-template-columns: minmax(150px, 24%) minmax(0, 1fr) auto; column-gap: 8px; padding-inline: 13px; }
+  .player .now-playing { padding-right: 4px; }
+}
+@media (max-width: 760px) {
+  .player { grid-template-columns: minmax(108px, 30%) minmax(0, 1fr); column-gap: 5px; padding-inline: 8px; }
+  .player .now-playing .cover { width: 42px; height: 42px; min-width: 42px; }
+  .player .player-output { display: none; }
+  .player .seek { gap: 4px; }
+}

@@ -1,0 +1,11 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './styles.css';
+import './uiPolish.css';
+import './phase3d16.css';
+import './playerControlLayout.css';
+import './playerPolish.css';
+import './settingsPolish.css';
+import './glassRedesign.css';
+createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

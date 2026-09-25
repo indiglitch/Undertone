@@ -1,0 +1,15 @@
+:root{--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--radius-sm:7px;--radius-md:10px;--radius-lg:14px;--surface-panel:#17171d;--surface-raised:#202027;--border-subtle:#303039;--border-strong:#464657;--text-secondary:#b8b8c2;--text-muted:#898994;--state-hover:rgba(255,255,255,.07);--state-active:rgba(255,255,255,.12)}
+button,.icon-button{transition:background-color .14s ease,color .14s ease,border-color .14s ease,transform .14s ease}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid #a8a4ff;outline-offset:2px}
+.sidebar nav>.tooltip-anchor{display:flex;width:100%}.sidebar nav>.tooltip-anchor>button{width:100%;min-width:0}.sidebar nav button{border-radius:var(--radius-md)}
+.sidebar nav button span,.now-playing span,.track-main,.panel-track-copy{min-width:0}.sidebar nav button span,.now-playing strong,.now-playing small,.panel-track-copy strong,.panel-track-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player{border-top-color:var(--border-subtle);background:linear-gradient(180deg,#18181f 0%,#121217 100%)}
+.transport-buttons,.volume{gap:var(--space-2)}.icon-button:hover:not(:disabled){background:var(--state-hover)}.icon-button:active:not(:disabled){background:var(--state-active)}
+.details-panel{border-left-color:var(--border-subtle);background:linear-gradient(180deg,var(--surface-panel),#131318)}
+.details-panel section,.lyrics-indexer,.download-item,.queue-current,.scan-result{border-color:var(--border-subtle);border-radius:var(--radius-lg);background:var(--surface-raised)}
+.lyrics-indexer-counters div{border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:rgba(0,0,0,.12)}
+.panel-lyrics-heading{gap:var(--space-2)}.lyrics-source-badge{display:inline-flex;align-items:center;max-width:100%;padding:3px 7px;border:1px solid var(--border-subtle);border-radius:999px;color:var(--text-secondary);background:rgba(255,255,255,.035);font-size:11px;white-space:nowrap}
+.helper-text{margin:var(--space-2) 0 0;color:var(--text-muted);font-size:12px;line-height:1.45}
+.lyrics-indexer-help{max-width:700px}.empty-state p{max-width:540px;line-height:1.55}
+.track-context-menu .tooltip-anchor{display:flex;width:100%}.track-context-menu .tooltip-anchor>button,.track-context-menu .tooltip-anchor>summary{width:100%}
+@media(max-width:900px){.player-format,.player-autoplay,.player-trash{display:none}.player{min-width:0}.now-playing{min-width:0}.transport{min-width:180px}}

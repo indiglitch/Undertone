@@ -1,0 +1,49 @@
+{
+  "name": "undertone",
+  "version": "0.2.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc && vite build",
+    "tauri": "tauri",
+    "desktop": "tauri dev --features slskd,external-lyrics",
+    "test:search": "node --test --experimental-strip-types src/soulseekSearch.test.ts",
+    "test:downloads": "node --test --experimental-strip-types src/downloadModel.test.ts",
+    "test:navigation": "node --test --experimental-strip-types src/navigationModel.test.ts",
+    "test:playback": "node --test --experimental-strip-types src/playbackModes.test.ts",
+    "test:track-context-menu": "node --test --experimental-strip-types src/trackContextMenuModel.test.ts",
+    "test:lyrics-indexing": "node --test --experimental-strip-types src/bulkLyricsModel.test.ts",
+    "test:lyrics-view": "node --test --experimental-strip-types src/lyricsViewModel.test.ts",
+    "test:phase3d2": "node --test --experimental-strip-types src/phase3d2Model.test.ts",
+    "test:deleted-songs": "node --test --experimental-strip-types src/deletedSongsModel.test.ts",
+    "test:resizable-layout": "node --test --experimental-strip-types src/resizableLayoutModel.test.ts",
+    "test:playback-session": "node --test --experimental-strip-types src/playbackSessionModel.test.ts",
+    "test:player-responsive": "node --test --experimental-strip-types src/playerResponsive.test.ts",
+    "test:visualizer": "node --test --experimental-strip-types src/musicVisualizer.test.ts",
+    "test:player-layout": "node --test --experimental-strip-types src/playerLayout.test.ts",
+    "test:full-visualizer": "node --test --experimental-strip-types src/fullVisualizer.test.ts",
+    "test:ui-polish": "node --test --experimental-strip-types src/uiPolish.test.ts",
+    "test:phase3d8": "node --test --experimental-strip-types src/phase3d8.test.ts",
+    "test:phase3d9": "node --test --experimental-strip-types src/phase3d9.test.ts",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "package": "tauri build --features slskd,external-lyrics"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.12",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-updater": "^2.12.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0"
+  }
+}
