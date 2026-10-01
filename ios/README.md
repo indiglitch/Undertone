@@ -31,20 +31,17 @@ The GitHub workflow runs on pushes to `codex/ios-companion`, or by manual dispat
 ## SideStore installation
 
 1. Download the `Undertone-SideStore` Actions artifact; unpack the ZIP to obtain the IPA.
-2. Import the IPA into SideStore and sign with your existing Apple Account.
+2. Install the IPA through iLoader, which successfully installed version 0.1 on the user device. SideStore signing remains a device-specific alternative.
 3. Refresh the app before its free provisioning profile expires.
 4. Keep the same signing account and bundle identity (`local.undertone.ios`). Do not uninstall the app to update it: uninstalling deletes local music.
 
 Actual refresh/update preservation needs a device test with SideStore; it is not guaranteed merely by keeping a bundle identifier.
 
-## Next milestone: PC pairing and transfer
+## Remaining sync work
 
-- Add an explicitly enabled PC service and device management in desktop Undertone.
-- Pair by QR containing a one-time secret plus certificate fingerprint; require TLS and device authentication; store credentials in Keychain / Windows Credential Manager.
-- Manifest DTO: schema version, desktop `sync_id`, revision, title/artist/album, format, byte size, SHA-256, artwork identity. Never export Windows paths or Soulseek secrets.
-- Resolve file endpoints by library identity only; canonical-path and library-membership checks; ranged original-byte transfer.
-- Persistent URLSession background downloads into staging, size/hash verification, atomic install, retries and storage-limit handling.
-- Catalog revisions and deletion tombstones, then two-way likes/playlists. Local-copy deletion is distinct from source deletion.
+- Persistent background downloads and byte-range resume.
+- Catalog revisions, deletion tombstones and two-way likes/playlists.
+- Embedded artwork and additional audio decoders.
 
 ## Acceptance on the real iPhone
 
