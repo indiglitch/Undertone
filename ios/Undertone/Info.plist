@@ -13,6 +13,7 @@
   <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
   <key>UIBackgroundModes</key><array><string>audio</string></array>
   <key>NSLocalNetworkUsageDescription</key><string>Undertone подключается к вашему ПК для синхронизации библиотеки и загрузки оригинальных музыкальных файлов.</string>
+  <key>NSBonjourServices</key><array><string>_undertone._tcp</string></array>
   <key>NSCameraUsageDescription</key><string>Камера сканирует QR-код подключения к Undertone на вашем ПК.</string>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>LSSupportsOpeningDocumentsInPlace</key><true/>

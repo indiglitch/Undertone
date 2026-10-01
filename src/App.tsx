@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { AudioLines, House, LibraryBig, FolderPlus, Search, ArrowUpRight, ArrowRight, ArrowLeft, Play, RefreshCw, HardDrive, X, Folder, Check, Disc3, Music2, Info, Users, Heart, ListMusic, Clock3, Plus, Download, MicVocal, Settings as SettingsIcon, Unplug, Pencil } from 'lucide-react';
 import { Collections, DeletedSongsSettings, ExternalLyricsResult, ExternalLyricsStatus, Library, LyricsDocument, MoveTrackResult, Playlist, Progress, Track, TrackFileStatus, time } from './types';
@@ -78,6 +79,10 @@ export default function App() {
     const task=collectionJobs.current.catch(()=>{}).then(()=>invoke<Collections>('collections')).then(result=>{setCollections(result);return result;});
     collectionJobs.current=task;return task;
   },[]);
+  useEffect(()=>{if(!isTauri())return;let disposed=false;let stop:(()=>void)|undefined;
+    void listen('phone-collections-changed',()=>{void refreshCollections().catch(report);}).then(unlisten=>{if(disposed)unlisten();else stop=unlisten;});
+    return()=>{disposed=true;stop?.();};
+  },[refreshCollections,report]);
   async function mutate(action:Record<string,unknown>){
     setCollectionBusy(true);
     const task=collectionJobs.current.catch(()=>{}).then(()=>invoke<Collections>('collection_action',{action})).then(result=>{setCollections(result);return result;});

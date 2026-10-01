@@ -114,6 +114,7 @@ actor LibraryRepository {
         if !FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.moveItem(at: temporary, to: destination)
         }
+        await CoverStore.shared.extract(destination, id: hash)
         songs = try read()
         songs.removeAll { $0.id == hash }
         songs.append(song)
@@ -121,7 +122,7 @@ actor LibraryRepository {
         return song
     }
 
-    func installDownload(_ file: URL, track: PCTrack, expectedHash: String) throws {
+    func installDownload(_ file: URL, track: PCTrack, expectedHash: String) async throws {
         try prepare()
         let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard Int64(size) == track.size, try Self.sha256(file) == expectedHash.lowercased(),
@@ -132,6 +133,8 @@ actor LibraryRepository {
         if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.moveItem(at: file, to: destination) }
         let song = Song(id: expectedHash.lowercased(), syncID: track.id, filename: filename, title: track.title, artist: track.artist,
                         album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date())
+        await CoverStore.shared.extract(destination, id: track.id)
+        songs = try read()
         songs.removeAll { $0.id == song.id || $0.syncID == track.id }; songs.append(song)
         try write(songs)
     }
@@ -144,11 +147,25 @@ final class LibraryStore: ObservableObject {
     @Published var error: String?
     let repository = LibraryRepository(root: LibraryRepository.defaultRoot())
 
-    var bytes: Int64 { songs.reduce(0) { $0 + $1.size } }
-    var albums: [String: [Song]] { Dictionary(grouping: songs, by: { "\($0.artist) — \($0.album)" }) }
+    @Published private(set) var bytes: Int64 = 0
+    @Published private(set) var albums: [String: [Song]] = [:]
+    @Published private(set) var sortedSongs: [Song] = []
+    @Published private(set) var recentSongs: [Song] = []
+    @Published private(set) var installedIDs: Set<String> = []
+    @Published private(set) var revision = 0
 
     func load() async {
-        do { songs = try await repository.read() }
+        do {
+            let records = try await repository.read()
+            guard records != songs else { return }
+            let index = await Task.detached(priority: .userInitiated) {
+                (records.reduce(Int64(0)) { $0 + $1.size }, Dictionary(grouping: records, by: { "\($0.artist) — \($0.album)" }),
+                 records.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
+                 Array(records.sorted { $0.addedAt > $1.addedAt }.prefix(8)), Set(records.compactMap(\.syncID)))
+            }.value
+            bytes = index.0; albums = index.1; sortedSongs = index.2; recentSongs = index.3; installedIDs = index.4
+            songs = records; revision += 1
+        }
         catch { self.error = error.localizedDescription }
     }
 

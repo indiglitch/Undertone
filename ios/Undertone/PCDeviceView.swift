@@ -17,13 +17,7 @@ struct PCDeviceView: View {
                 Label("\(pc.tracks.count) треков в каталоге", systemImage: "music.note.list")
                 Button(pc.refreshing ? "Обновляем…" : "Обновить библиотеку", systemImage: "arrow.clockwise") { Task { await pc.refresh() } }.buttonStyle(.glass).disabled(pc.refreshing)
                 Button("Скачать всю библиотеку", systemImage: "arrow.down.circle") { pc.download(pc.tracks, library: library) }.buttonStyle(.glassProminent).disabled(pc.tracks.isEmpty || pc.downloading != nil || library.importing)
-                if let title = pc.downloading {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ProgressView("Скачиваем: \(title)")
-                        Text("Загружено: \(pc.completedDownloads). Оставь приложение открытым до завершения.").font(.caption).foregroundStyle(.secondary)
-                        Button("Остановить загрузку") { pc.cancelDownloads() }
-                    }.padding(20).modifier(GlassSurface())
-                }
+                DownloadStatus()
                 Button("Отключить компьютер", role: .destructive) { pc.disconnect() }
             }
             Button("Сканировать QR-код", systemImage: "qrcode.viewfinder") { scanning = true }.buttonStyle(.glassProminent).disabled(pc.downloading != nil)
@@ -31,7 +25,7 @@ struct PCDeviceView: View {
                 TextEditor(text: $code).frame(height: 100).font(.caption).autocorrectionDisabled().textInputAutocapitalization(.never)
                 Button("Подключить") { Task { await pc.pair(code) } }.disabled(code.isEmpty || pc.downloading != nil)
             }
-            Text("После скачивания музыка работает без ПК и интернета. Отключение доступа на ПК отменяет код подключения; при новом запуске доступа отсканируй новый код.").font(.caption).foregroundStyle(.secondary)
+            Text("После скачивания музыка работает без ПК и интернета. Подключение сохраняется, компьютер обнаруживается автоматически. Доступ можно приостановить в настройках ПК.").font(.caption).foregroundStyle(.secondary)
         }
         .sheet(isPresented: $scanning) {
             QRScanner { value in scanning = false; Task { await pc.pair(value) } }

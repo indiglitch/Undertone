@@ -55,7 +55,6 @@ struct RootView: View {
     @State private var tab: MobileTab = .home
     @State private var importer = false
     @State private var expandedPlayer = false
-    @State private var query = ""
 
     var body: some View {
         ZStack {
@@ -64,15 +63,16 @@ struct RootView: View {
             TabView(selection: $tab) {
                 ForEach(MobileTab.allCases, id: \.self) { item in
                     NavigationStack {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 28) {
-                                if item == .home { home }
-                                else if item == .device { PCDeviceView() }
-                                else { collection(downloads: item == .downloads) }
+                        Group {
+                            if item == .library || item == .downloads { MusicLibraryView(downloadsOnly: item == .downloads) }
+                            else {
+                                ScrollView {
+                                    LazyVStack(alignment: .leading, spacing: 28) {
+                                        if item == .home { home } else { PCDeviceView() }
+                                    }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 28)
+                                }.scrollContentBackground(.hidden)
                             }
-                            .padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 28)
                         }
-                        .scrollContentBackground(.hidden)
                         .navigationTitle(item.rawValue)
                         .toolbar {
                             if item != .device {
@@ -90,13 +90,14 @@ struct RootView: View {
                 }
             }
         }
+        .background { DownloadErrorAlerts() }
         .fileImporter(isPresented: $importer, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task { await library.importFiles(urls) }
             case .failure(let error): library.error = error.localizedDescription
             }
         }
-        .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player) }
+        .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player).environmentObject(player.clock) }
         .alert("Не удалось завершить действие", isPresented: Binding(
             get: { library.error != nil || player.error != nil || pc.error != nil },
             set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil } }
@@ -129,15 +130,15 @@ struct RootView: View {
                 emptyLibrary
             } else {
                 sectionHeading("Недавно добавлено", detail: "На устройстве")
-                songList(Array(library.songs.sorted { $0.addedAt > $1.addedAt }.prefix(8)))
+                songList(library.recentSongs)
                 sectionHeading("Альбомы", detail: "\(library.albums.count)")
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 18) {
+                    LazyHStack(alignment: .top, spacing: 18) {
                         ForEach(library.albums.keys.sorted(), id: \.self) { key in
                             if let songs = library.albums[key], let first = songs.first {
                                 Button { start(first, queue: songs) } label: {
                                     VStack(alignment: .leading, spacing: 10) {
-                                        Artwork(size: 144)
+                                        CoverArtwork(id: first.syncID ?? first.id, size: 144)
                                         Text(first.album).font(.subheadline.weight(.semibold)).lineLimit(2)
                                         Text(first.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                     }.frame(width: 144, alignment: .leading)
@@ -169,57 +170,6 @@ struct RootView: View {
         }.padding(.vertical, 6)
     }
 
-    private func collection(downloads: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
-            if downloads {
-                HStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.undertone)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Доступно без интернета").font(.headline)
-                        Text("\(library.songs.count) файлов · \(ByteCountFormatter.string(fromByteCount: library.bytes, countStyle: .file))").font(.caption).foregroundStyle(.secondary)
-                    }
-                }.padding(20).modifier(GlassSurface())
-            }
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Песня, исполнитель, альбом", text: $query).autocorrectionDisabled()
-                if !query.isEmpty {
-                    Button("Очистить поиск", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly).frame(minWidth: 44, minHeight: 44)
-                }
-            }.padding(.horizontal, 16).frame(minHeight: 52).modifier(GlassSurface(radius: 26))
-            let songs = library.songs.filter { query.isEmpty || "\($0.title) \($0.artist) \($0.album)".localizedCaseInsensitiveContains(query) }
-                .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-            if library.songs.isEmpty { emptyLibrary }
-            else if songs.isEmpty { ContentUnavailableView.search(text: query) }
-            else { songList(songs) }
-            if !downloads && !pc.tracks.isEmpty {
-                sectionHeading("На компьютере", detail: "\(pc.tracks.count)")
-                if let title = pc.downloading { ProgressView("Скачиваем: \(title)") }
-                LazyVStack(spacing: 16) {
-                    ForEach(pc.tracks.filter { remote in !library.songs.contains(where: { $0.syncID == remote.id }) && (query.isEmpty || "\(remote.title) \(remote.artist) \(remote.album)".localizedCaseInsensitiveContains(query)) }) { track in
-                        HStack(spacing: 12) {
-                            Artwork(size: 52)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(track.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                                Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                Text(track.format.uppercased()).font(.caption2).foregroundStyle(Color.undertone)
-                            }
-                            Spacer()
-                            Button("Скачать \(track.title)", systemImage: "arrow.down.circle") { pc.download([track], library: library) }
-                                .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(pc.downloading != nil || library.importing)
-                        }
-                    }
-                }
-                let albums = Dictionary(grouping: pc.tracks, by: { "\($0.artist) — \($0.album)" })
-                sectionHeading("Скачать альбом", detail: "\(albums.count)")
-                ForEach(albums.keys.sorted(), id: \.self) { name in
-                    Button { pc.download(albums[name] ?? [], library: library) } label: { Label(name, systemImage: "arrow.down.circle").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8) }
-                        .disabled(pc.downloading != nil || library.importing)
-                }
-            }
-        }
-    }
-
     private func stat(_ title: String, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: icon).foregroundStyle(Color.undertone)
@@ -236,7 +186,7 @@ struct RootView: View {
             ForEach(songs) { song in
                 Button { start(song, queue: songs) } label: {
                     HStack(spacing: 13) {
-                        Artwork(size: 52)
+                        CoverArtwork(id: song.syncID ?? song.id, size: 52)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                             Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -259,7 +209,7 @@ struct RootView: View {
         HStack(spacing: 12) {
             Button { expandedPlayer = true } label: {
                 HStack(spacing: 12) {
-                    Artwork(size: 44)
+                    CoverArtwork(id: song.syncID ?? song.id, size: 44)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                         Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -277,6 +227,7 @@ struct RootView: View {
 
 struct PlayerView: View {
     @EnvironmentObject private var player: MusicPlayer
+    @EnvironmentObject private var playbackClock: PlaybackClock
     @Environment(\.dismiss) private var dismiss
     @State private var seeking = false
     @State private var seekPosition = 0.0
@@ -289,18 +240,18 @@ struct PlayerView: View {
             GeometryReader { geometry in
                 ScrollView {
                     VStack(spacing: 30) {
-                        Artwork(size: min(geometry.size.width - 52, 350)).padding(.top, 24)
+                        CoverArtwork(id: player.current.map { $0.syncID ?? $0.id }, size: min(geometry.size.width - 52, 350)).padding(.top, 24)
                         VStack(spacing: 8) {
                             Text(player.current?.title ?? "Нет выбранного трека").font(.title2.bold()).multilineTextAlignment(.center)
                             Text(player.current?.artist ?? "").foregroundStyle(.secondary)
                             Text("\(player.current?.format ?? "") · Оригинальный файл").font(.caption).foregroundStyle(Color.undertone)
                         }
                         VStack(spacing: 6) {
-                            Slider(value: Binding(get: { seeking ? seekPosition : player.position }, set: { seekPosition = $0 }), in: 0...max(1, player.duration)) { editing in
-                                if editing { seekPosition = player.position; seeking = true }
+                            Slider(value: Binding(get: { seeking ? seekPosition : playbackClock.position }, set: { seekPosition = $0 }), in: 0...max(1, player.duration)) { editing in
+                                if editing { seekPosition = playbackClock.position; seeking = true }
                                 else { player.seek(seekPosition); seeking = false }
                             }.accessibilityLabel("Позиция воспроизведения")
-                            HStack { Text(clock(seeking ? seekPosition : player.position)); Spacer(); Text(clock(player.duration)) }
+                            HStack { Text(clock(seeking ? seekPosition : playbackClock.position)); Spacer(); Text(clock(player.duration)) }
                                 .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                         }
                         GlassEffectContainer(spacing: 20) {

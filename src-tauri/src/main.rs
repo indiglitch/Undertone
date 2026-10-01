@@ -6,25 +6,28 @@ mod system_actions;
 use database::{Database, Library};
 use scanner::{Progress, ScanState};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
+use tauri::{Manager, State, Emitter};
 
 #[derive(Default)]
 struct PhoneServer(Mutex<Option<undertone_phone_sync::Server>>);
+fn start_phone_server(path: std::path::PathBuf, app: tauri::AppHandle) -> Result<undertone_phone_sync::Server,String> {
+    let server=undertone_phone_sync::Server::start(path)?;
+    server.on_collections_change(move || {let _=app.emit("phone-collections-changed",());});
+    Ok(server)
+}
 #[tauri::command]
 fn phone_sync_status(server: State<'_, PhoneServer>) -> Option<undertone_phone_sync::Status> {
     server.0.lock().unwrap().as_ref().map(|s|s.status())
 }
 #[tauri::command]
-async fn phone_sync_start(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<undertone_phone_sync::Status,String> {
+async fn phone_sync_start(app: tauri::AppHandle, db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<undertone_phone_sync::Status,String> {
     let mut running = server.0.lock().map_err(|_|"Phone server unavailable")?;
-    if running.is_none() { *running=Some(undertone_phone_sync::Server::start(db.path.clone())?); }
+    if running.is_none() { *running=Some(start_phone_server(db.path.clone(), app)?); }
     undertone_phone_sync::Server::set_enabled(&db.path, true)?;
     Ok(running.as_ref().unwrap().status())
 }
 #[tauri::command]
 fn phone_sync_stop(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<(),String> { undertone_phone_sync::Server::set_enabled(&db.path, false)?; *server.0.lock().unwrap()=None; Ok(()) }
-
-
 
 #[tauri::command]
 async fn collections(
@@ -580,7 +583,7 @@ fn main() {
             ).map_err(std::io::Error::other)?;
             let db = Database::open(&data_dir).map_err(std::io::Error::other)?;
             let phone = if undertone_phone_sync::Server::enabled(&db.path) {
-                match undertone_phone_sync::Server::start(db.path.clone()) { Ok(server)=>Some(server), Err(error)=>{eprintln!("Phone access could not restart: {error}");None} }
+                match start_phone_server(db.path.clone(), app.handle().clone()) { Ok(server)=>Some(server), Err(error)=>{eprintln!("Phone access could not restart: {error}");None} }
             } else {None};
             app.manage(db);
             app.manage(PhoneServer(Mutex::new(phone)));

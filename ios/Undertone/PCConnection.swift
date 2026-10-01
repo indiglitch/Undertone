@@ -14,12 +14,13 @@ struct PCPairing: Codable {
               url.path.isEmpty, let port = url.port, (1...65535).contains(port),
               token.count == 64, fingerprint.count == 64,
               token.allSatisfy({ $0.isHexDigit }), fingerprint.allSatisfy({ $0.isHexDigit }) else { throw PCError.invalidCode }
+        if host.lowercased() == "undertone-" + fingerprint.lowercased().prefix(16) + ".local" { return }
         let parts = host.split(separator: ".").compactMap { Int($0) }
         guard parts.count == 4, parts.allSatisfy({ (0...255).contains($0) }),
               parts[0] == 10 || (parts[0] == 192 && parts[1] == 168) || (parts[0] == 172 && (16...31).contains(parts[1])) else { throw PCError.invalidCode }
     }
 }
-struct PCTrack: Codable, Identifiable, Sendable {
+struct PCTrack: Codable, Identifiable, Sendable, Equatable {
     let sync_id: String
     let title: String
     let artist: String
@@ -27,9 +28,10 @@ struct PCTrack: Codable, Identifiable, Sendable {
     let duration: Double
     let format: String
     let size: Int64
+    var has_cover: Bool? = nil
     var id: String { sync_id }
 }
-struct PCCatalog: Codable { let version: Int; let tracks: [PCTrack] }
+struct PCCatalog: Codable, Sendable { let version: Int; let tracks: [PCTrack] }
 enum PCError: LocalizedError {
     case invalidCode, disconnected, rejected, corruptDownload
     var errorDescription: String? {
@@ -85,88 +87,160 @@ enum PCKeychain {
 @MainActor
 final class PCConnection: ObservableObject {
     @Published private(set) var tracks: [PCTrack] = []
+    @Published private(set) var catalogRevision = 0
+    @Published private(set) var albums: [String: [PCTrack]] = [:]
     @Published private(set) var address = ""
     @Published private(set) var refreshing = false
-    @Published private(set) var downloading: String?
-    @Published private(set) var completedDownloads = 0
+    @Published private(set) var online = false
+    @Published private(set) var collections = PCCollections()
+    @Published private(set) var pendingCount = 0
+    @Published private(set) var collectionsRevision = 0
     @Published var error: String?
     private var pairing: PCPairing?
     private var session: URLSession?
     private var generation = 0
-    private var downloadTask: Task<Void, Never>?
-    private let cache = LibraryRepository.defaultRoot().appendingPathComponent("pc-catalog.json")
+    private let storage = PCStorage()
+    private var state = PCStoredState()
+    private var initialized = false
+    private var syncing = false
+    private let discovery = PCDiscovery()
+    private var refreshTask: Task<Void, Never>?
+    var downloading: String? { BackgroundDownloads.shared.title }
+    var completedDownloads: Int { BackgroundDownloads.shared.completed }
     init() {
         if let stored = PCKeychain.read(), (try? stored.validate()) != nil { configure(stored) }
-        if let data = try? Data(contentsOf: cache), let catalog = try? JSONDecoder().decode(PCCatalog.self, from: data), catalog.version == 1 { tracks = catalog.tracks }
+        discovery.resolved = { [weak self] host, port in
+            guard let self, let old = self.pairing else { return }
+            let address = "https://\(host):\(port)"
+            guard address != old.address else { return }
+            let found = PCPairing(version: 1, address: address, token: old.token, fingerprint: old.fingerprint)
+            guard (try? found.validate()) != nil else { return }
+            Task {
+                do {
+                    try PCKeychain.save(found); self.configure(found)
+                    await BackgroundDownloads.shared.addressChanged(); await self.refresh(quiet: true)
+                } catch { self.error = error.localizedDescription }
+            }
+        }
     }
+    func initialize() async {
+        guard !initialized else { return }; initialized = true
+        do {
+            if let cached = try await storage.catalog(), cached.version == 1 { await accept(cached.tracks) }
+            state = try await storage.read(); publishCollections()
+        } catch { self.error = error.localizedDescription }
+    }
+    func activate() {
+        guard let pairing else { return }
+        discovery.start(fingerprint: pairing.fingerprint)
+        refreshTask?.cancel()
+        refreshTask = Task {
+            await initialize()
+            while !Task.isCancelled {
+                await refresh(quiet: true)
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+    }
+    func deactivate() { discovery.stop(); refreshTask?.cancel(); refreshTask = nil }
     private func configure(_ pairing: PCPairing) {
         session?.invalidateAndCancel()
         self.pairing = pairing; address = pairing.address
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 120
-        configuration.timeoutIntervalForResource = 3600
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 60
         session = URLSession(configuration: configuration, delegate: PinnedPCSession(pairing), delegateQueue: nil)
     }
+    private func accept(_ tracks: [PCTrack]) async {
+        guard self.tracks != tracks else { return }
+        let albums = await Task.detached(priority: .userInitiated) { Dictionary(grouping: tracks, by: { "\($0.artist) — \($0.album)" }) }.value
+        self.tracks = tracks; self.albums = albums; catalogRevision += 1
+    }
     func pair(_ code: String) async {
-        guard downloading == nil else { return }
+        guard !BackgroundDownloads.shared.active else { return }
         do {
             let decoded = try JSONDecoder().decode(PCPairing.self, from: Data(code.trimmingCharacters(in: .whitespacesAndNewlines).utf8))
             try decoded.validate()
+            if let old = pairing, old.fingerprint != decoded.fingerprint {
+                await BackgroundDownloads.shared.cancelAll(); state = PCStoredState(); try await storage.clear(); publishCollections()
+            }
             try PCKeychain.save(decoded)
             generation += 1; tracks = []; configure(decoded)
-            await refresh()
+            activate(); await refresh()
         } catch { self.error = error.localizedDescription }
     }
-    private func request(_ path: String) throws -> URLRequest {
+    func request(_ path: String) throws -> URLRequest {
         guard let pairing, let url = URL(string: pairing.address + path) else { throw PCError.disconnected }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(pairing.token)", forHTTPHeaderField: "Authorization")
         return request
     }
-    func refresh() async {
+    func data(_ path: String) async throws -> Data {
+        guard let session else { throw PCError.disconnected }
+        let (data, response) = try await session.data(for: request(path))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PCError.rejected }
+        return data
+    }
+    func refresh(quiet: Bool = false) async {
         guard !refreshing else { return }
         refreshing = true; let operation = generation
         defer { refreshing = false }
         do {
-            guard let session else { throw PCError.disconnected }
-            let (data, response) = try await session.data(for: request("/v1/library"))
-            guard operation == generation else { return }
-            guard (response as? HTTPURLResponse)?.statusCode == 200, data.count <= 32 * 1024 * 1024 else { throw PCError.rejected }
-            let catalog = try JSONDecoder().decode(PCCatalog.self, from: data)
-            guard catalog.version == 1, catalog.tracks.allSatisfy({ $0.sync_id.count == 32 && $0.sync_id.allSatisfy(\.isHexDigit) && $0.size >= 0 }) else { throw PCError.rejected }
-            try FileManager.default.createDirectory(at: cache.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: cache, options: .atomic)
-            tracks = catalog.tracks
-        } catch { if operation == generation { self.error = error.localizedDescription } }
+            let bytes = try await data("/v1/library")
+            guard bytes.count <= 32 * 1024 * 1024, operation == generation else { return }
+            let catalog = try await Task.detached(priority: .userInitiated) { try PCStorage.decodeCatalog(bytes) }.value
+            _ = try await storage.catalog(bytes); await accept(catalog.tracks); online = true
+            await syncCollections(quiet: quiet)
+        } catch { if operation == generation { online = false; if !quiet { self.error = error.localizedDescription } } }
+    }
+    private func publishCollections() {
+        var visible = state.collections
+        for edit in state.pending { visible.apply(edit) }
+        collections = visible; pendingCount = state.pending.count; collectionsRevision += 1
+    }
+    func edit(_ edit: PCEdit) {
+        state.pending.append(edit); publishCollections()
+        Task {
+            do { try await storage.save(state); await syncCollections(quiet: true) }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+    func syncCollections(quiet: Bool = false) async {
+        guard !syncing, let session else { return }; syncing = true; defer { syncing = false }
+        let operation = generation
+        do {
+            repeat {
+                let sending = Array(state.pending.prefix(500))
+                let snapshot: PCCollections
+                if sending.isEmpty {
+                    let bytes = try await data("/v1/collections")
+                    snapshot = try await Task.detached { try JSONDecoder().decode(PCCollections.self, from: bytes) }.value
+                } else {
+                    var request = try request("/v1/collections"); request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.httpBody = try JSONEncoder().encode(sending)
+                    let (bytes, response) = try await session.data(for: request)
+                    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                        let message = (try? JSONDecoder().decode([String:String].self, from: bytes)["error"]) ?? "Изменения не приняты ПК."
+                        throw NSError(domain: "UndertoneSync", code: 409, userInfo: [NSLocalizedDescriptionKey: message])
+                    }
+                    snapshot = try await Task.detached { try JSONDecoder().decode(PCCollections.self, from: bytes) }.value
+                }
+                guard generation == operation else { return }
+                let acknowledged = Set(sending.map(\.id)); state.pending.removeAll { acknowledged.contains($0.id) }
+                state.collections = snapshot; publishCollections(); try await storage.save(state)
+            } while !state.pending.isEmpty
+        } catch { if !quiet || (error as NSError).domain == "UndertoneSync" { self.error = error.localizedDescription } }
     }
     func disconnect() {
-        generation += 1; cancelDownloads(); session?.invalidateAndCancel(); session = nil
-        pairing = nil; address = ""; tracks = []; PCKeychain.remove(); try? FileManager.default.removeItem(at: cache)
+        generation += 1; deactivate(); session?.invalidateAndCancel(); session = nil
+        pairing = nil; address = ""; tracks = []; albums = [:]; online = false; PCKeychain.remove()
+        state = PCStoredState(); publishCollections()
+        Task { await BackgroundDownloads.shared.cancelAll(); try? await storage.clear() }
     }
-    func cancelDownloads() { downloadTask?.cancel(); downloadTask = nil }
+    func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {
-        guard downloading == nil, !library.importing else { return }
-        downloading = "Подготовка"; completedDownloads = 0
-        let operation = generation
-        downloadTask = Task {
-            defer { downloading = nil; downloadTask = nil }
-            do {
-                guard let session else { throw PCError.disconnected }
-                for track in selected {
-                    try Task.checkCancellation()
-                    guard operation == generation else { return }
-                    if library.songs.contains(where: { $0.syncID == track.id }) { continue }
-                    downloading = track.title
-                    let (file, response) = try await session.download(for: request("/v1/file/\(track.id)"))
-                    defer { try? FileManager.default.removeItem(at: file) }
-                    try Task.checkCancellation()
-                    guard let response = response as? HTTPURLResponse, response.statusCode == 200,
-                          let hash = response.value(forHTTPHeaderField: "X-Content-SHA256"), hash.count == 64 else { throw PCError.rejected }
-                    try await library.repository.installDownload(file, track: track, expectedHash: hash)
-                    await library.load(); completedDownloads += 1
-                }
-            } catch is CancellationError { }
-            catch { if operation == generation && !Task.isCancelled { self.error = error.localizedDescription } }
-        }
+        let installed = Set(library.songs.compactMap(\.syncID))
+        Task { await BackgroundDownloads.shared.enqueue(selected, installed: installed) }
     }
 }

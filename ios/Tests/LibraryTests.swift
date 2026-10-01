@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 @testable import Undertone
 
 final class LibraryTests: XCTestCase {
@@ -91,5 +92,33 @@ final class LibraryTests: XCTestCase {
     func testPairingRejectsPublicHostsAndInvalidSecrets() throws {
         XCTAssertThrowsError(try PCPairing(version: 1, address: "https://example.com:443", token: String(repeating: "a", count: 64), fingerprint: String(repeating: "b", count: 64)).validate())
         XCTAssertNoThrow(try PCPairing(version: 1, address: "https://192.168.1.4:3210", token: String(repeating: "a", count: 64), fingerprint: String(repeating: "b", count: 64)).validate())
+    }
+
+    @MainActor func testPlaybackClockDoesNotInvalidateMusicLibrary() {
+        let player = MusicPlayer(); var screenUpdates = 0; var clockUpdates = 0
+        let screen = player.objectWillChange.sink { screenUpdates += 1 }
+        let clock = player.clock.objectWillChange.sink { clockUpdates += 1 }
+        player.position = 42
+        XCTAssertEqual(screenUpdates, 0); XCTAssertEqual(clockUpdates, 1)
+        withExtendedLifetime((screen, clock)) {}
+    }
+    func testOfflineEditsAndPlaylistsSurviveReopen() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let store = PCStorage(root: directory)
+        let id = String(repeating: "a", count: 32), track = String(repeating: "b", count: 32)
+        let create = PCEdit(kind: "create_playlist", playlist: id, name: "Offline")
+        let add = PCEdit(kind: "add_tracks", playlist: id, tracks: [track])
+        let like = PCEdit(kind: "like", track: track, liked: true)
+        let state = PCStoredState(pending: [create, add, like])
+        try await store.save(state)
+        let restored = try await PCStorage(root: directory).read()
+        var visible = restored.collections; restored.pending.forEach { visible.apply($0) }
+        XCTAssertEqual(visible.playlists.first?.tracks, [track]); XCTAssertEqual(visible.likes, [track])
+        XCTAssertEqual(restored.pending.map(\.id), state.pending.map(\.id))
+    }
+    func testPinnedDiscoveryHostValidation() throws {
+        let token = String(repeating: "a", count: 64), fingerprint = String(repeating: "b", count: 64)
+        XCTAssertNoThrow(try PCPairing(version: 1, address: "https://undertone-" + fingerprint.prefix(16) + ".local:3210", token: token, fingerprint: fingerprint).validate())
+        XCTAssertThrowsError(try PCPairing(version: 1, address: "https://other.local:3210", token: token, fingerprint: fingerprint).validate())
     }
 }

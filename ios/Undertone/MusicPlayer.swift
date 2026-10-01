@@ -3,10 +3,14 @@ import MediaPlayer
 import Combine
 
 @MainActor
+final class PlaybackClock: ObservableObject { @Published var position = 0.0 }
+
+@MainActor
 final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var current: Song?
     @Published private(set) var playing = false
-    @Published private(set) var position = 0.0
+    let clock = PlaybackClock()
+    var position: Double { get { clock.position } set { clock.position = newValue } }
     @Published private(set) var duration = 0.0
     @Published var error: String?
     private var audio: AVAudioPlayer?
@@ -40,7 +44,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             Task { @MainActor in self?.seek(value) }; return .success
         }
         timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { [weak self] _ in
-            guard let self, let audio = self.audio else { return }
+            guard let self, self.playing, let audio = self.audio else { return }
             self.position = audio.currentTime
         }
         observers.append(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
