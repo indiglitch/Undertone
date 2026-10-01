@@ -1,0 +1,7 @@
+.phone-sync {padding:24px;background:rgba(255,255,255,.035);border-radius:24px;}
+.phone-sync p {color:var(--muted,#aaa);line-height:1.5;}
+.phone-sync button {min-height:44px;padding:10px 18px;border-radius:16px;background:#9a68ff;color:#fff;border:0;cursor:pointer;}
+.phone-sync button:disabled {opacity:.5;cursor:default;}
+.phone-sync-qr {width:280px;max-width:100%;padding:12px;border-radius:20px;background:white;margin-top:20px;}
+.phone-sync-qr svg {display:block;width:100%;height:auto;}
+.phone-sync textarea {width:100%;min-height:100px;font-family:monospace;resize:vertical;}

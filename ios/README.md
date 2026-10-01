@@ -11,7 +11,9 @@ Native SwiftUI client, deployment target iOS 26+. Uses the system Liquid Glass A
 - AVAudioPlayer, local queue, seeking, background-audio declaration, lock-screen metadata/remote commands, pause on interruptions or headphone disconnect.
 - XcodeGen project and GitHub Actions workflow: simulator persistence tests → unsigned device build → `Payload/Undertone.app` IPA → artifact.
 
-The app does not yet connect to the PC, download over Wi-Fi, merge playlists, display embedded cover artwork, or decode formats unsupported by AVAudioPlayer. No fake tracks, paired devices, or download successes are shown. The waveform artwork is the Undertone fallback, not extracted cover art.
+Version 0.2 adds PC pairing by QR (or pasted pairing JSON), certificate-pinned HTTPS, Keychain credentials, cached PC catalog, individual/album/all-library downloads and SHA-256/size verification. Enable access in desktop Settings → Music on iPhone. Both devices must share a private IPv4 LAN. The server is off by default; stopping/restarting it invalidates the pairing. Downloaded originals are independent of PC availability.
+
+Downloads currently require the iPhone app to remain in the foreground; interrupted downloads can be retried, but byte-range resume and persistent background URLSession jobs are not implemented yet. Two-way playlists/likes, embedded cover artwork, and non-native decoding remain follow-up work. The waveform artwork is the Undertone fallback, not extracted cover art.
 
 ## Build
 

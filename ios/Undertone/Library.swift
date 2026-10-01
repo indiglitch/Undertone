@@ -125,7 +125,7 @@ actor LibraryRepository {
         try prepare()
         let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard Int64(size) == track.size, try Self.sha256(file) == expectedHash.lowercased(),
-              !track.format.isEmpty, track.format.count <= 8, track.format.allSatisfy({ $0.isASCII && $0.isLetter || $0.isNumber }) else { throw PCError.corruptDownload }
+              !track.format.isEmpty, track.format.count <= 8, track.format.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else { throw PCError.corruptDownload }
         let filename = "\(expectedHash.lowercased()).\(track.format.lowercased())"
         let destination = root.appendingPathComponent("Music").appendingPathComponent(filename)
         var songs = try read()

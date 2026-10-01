@@ -78,7 +78,7 @@ struct RootView: View {
                             if item != .device {
                                 ToolbarItem(placement: .topBarTrailing) {
                                     Button("Добавить файлы", systemImage: "plus") { importer = true }
-                                        .disabled(library.importing)
+                                        .disabled(library.importing || pc.downloading != nil)
                                 }
                             }
                         }
@@ -116,7 +116,7 @@ struct RootView: View {
                     Label(library.importing ? "Импортируем…" : "Добавить музыку", systemImage: library.importing ? "arrow.down" : "plus")
                         .font(.subheadline.weight(.semibold)).frame(minHeight: 44).padding(.horizontal, 12)
                 }
-                .buttonStyle(.glassProminent).disabled(library.importing)
+                .buttonStyle(.glassProminent).disabled(library.importing || pc.downloading != nil)
             }
             .padding(24)
             .background(LinearGradient(colors: [.undertone.opacity(0.20), .white.opacity(0.035)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 32))
@@ -217,26 +217,6 @@ struct RootView: View {
                         .disabled(pc.downloading != nil || library.importing)
                 }
             }
-        }
-    }
-
-    private var devices: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            ZStack {
-                Circle().fill(Color.undertone.opacity(0.12)).frame(width: 132, height: 132)
-                Image(systemName: "desktopcomputer.and.arrow.down").font(.system(size: 52)).foregroundStyle(Color.undertone)
-            }.frame(maxWidth: .infinity).padding(.vertical, 20)
-            Text("Музыка с твоего ПК").font(.largeTitle.bold())
-            Text("Здесь появится подключение к Undertone на компьютере: каталог, плейлисты и загрузка оригинальных файлов по Wi-Fi.")
-                .foregroundStyle(.secondary)
-            Label("Подключение к ПК ещё в разработке", systemImage: "hammer").font(.subheadline).padding(20).frame(maxWidth: .infinity, alignment: .leading).modifier(GlassSurface())
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Оригинальные файлы без перекодирования", systemImage: "waveform")
-                Label("Скачанная музыка остаётся на iPhone", systemImage: "iphone")
-                Label("Сейчас можно импортировать из «Файлов»", systemImage: "folder")
-            }.font(.subheadline).foregroundStyle(.secondary)
-            Button("Добавить локальные файлы", systemImage: "plus") { importer = true }
-                .buttonStyle(.glassProminent).disabled(library.importing)
         }
     }
 

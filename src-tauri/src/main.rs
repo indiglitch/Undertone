@@ -8,6 +8,23 @@ use scanner::{Progress, ScanState};
 use std::sync::{Arc, Mutex};
 use tauri::{Manager, State};
 
+#[derive(Default)]
+struct PhoneServer(Mutex<Option<undertone_phone_sync::Server>>);
+#[tauri::command]
+fn phone_sync_status(server: State<'_, PhoneServer>) -> Option<undertone_phone_sync::Status> {
+    server.0.lock().unwrap().as_ref().map(|s|s.status())
+}
+#[tauri::command]
+async fn phone_sync_start(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<undertone_phone_sync::Status,String> {
+    let mut running = server.0.lock().map_err(|_|"Phone server unavailable")?;
+    if running.is_none() { *running=Some(undertone_phone_sync::Server::start(db.path.clone())?); }
+    Ok(running.as_ref().unwrap().status())
+}
+#[tauri::command]
+fn phone_sync_stop(server: State<'_, PhoneServer>) { *server.0.lock().unwrap()=None; }
+
+
+
 #[tauri::command]
 async fn collections(
     db: State<'_, Database>,
@@ -562,6 +579,7 @@ fn main() {
             ).map_err(std::io::Error::other)?;
             let db = Database::open(&data_dir).map_err(std::io::Error::other)?;
             app.manage(db);
+            app.manage(PhoneServer::default());
             app.manage(undertone::bulk_lyrics::BulkLyricsJob::default());
             #[cfg(all(
                 feature = "external-lyrics",
@@ -583,6 +601,7 @@ fn main() {
         });
     #[cfg(all(feature = "slskd", target_os = "windows"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        phone_sync_status, phone_sync_start, phone_sync_stop,
         library,
         track_metadata_details,
         playback_session,
@@ -624,6 +643,7 @@ fn main() {
     ]);
     #[cfg(not(all(feature = "slskd", target_os = "windows")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        phone_sync_status, phone_sync_start, phone_sync_stop,
         library,
         track_metadata_details,
         playback_session,

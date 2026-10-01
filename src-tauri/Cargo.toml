@@ -8,6 +8,7 @@ default-run = "undertone"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+undertone-phone-sync = { path = "../phone-sync" }
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
