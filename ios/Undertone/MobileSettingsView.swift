@@ -20,6 +20,7 @@ struct MobileSettingsView: View {
     @EnvironmentObject private var personal: PersonalLibrary
     @AppStorage("createTabVisible") private var createVisible = true
     @AppStorage("offlineMode") private var offline = false
+    @AppStorage("canvasEnabled") private var canvas = true
     @AppStorage("lyricsPreview") private var lyrics = true
     @State private var clearHistory = false
     @State private var clearTrash = false
@@ -28,6 +29,7 @@ struct MobileSettingsView: View {
             Section("Приложение") {
                 Toggle("Вкладка «Создать»",isOn:$createVisible)
                 Toggle("Предпросмотр текста в плеере",isOn:$lyrics)
+                Toggle("Локальные зацикленные видео",isOn:$canvas)
             }
             Section("Сеть и офлайн") {
                 Toggle("Офлайн-режим",isOn:$offline)

@@ -19,7 +19,7 @@ struct LyricsDocument: Codable, Sendable {
             for match in matches {
                 func capture(_ index: Int) -> String { Range(match.range(at:index),in:raw).map { String(raw[$0]) } ?? "" }
                 let minute = Int64(capture(1)) ?? 0, second = Int64(capture(2)) ?? 0, fraction = capture(3)
-                guard second < 60 else { continue }
+                guard second < 60, minute <= 1000000 else { continue }
                 let millis = Int64((fraction + "000").prefix(3)) ?? 0
                 lines.append(LyricLine(timestamp_ms:(minute*60+second)*1000+millis,text:content))
             }

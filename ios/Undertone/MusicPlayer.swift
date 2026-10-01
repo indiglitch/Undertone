@@ -105,7 +105,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             guard generation == playGeneration else { return }
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
+            if autoplay { try session.setActive(true) }
             do {
                 let prepared = try await Task.detached(priority: .userInitiated) {
                     let player = try AVAudioPlayer(contentsOf: url); player.prepareToPlay()
@@ -161,7 +161,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func seek(_ value: Double) {
         guard value.isFinite else { return }
         let target = min(max(0, value), duration)
-        if let vorbis { Task { do { try await vorbis.seek(target); position = vorbis.currentTime; updateNowPlaying() } catch { self.error = error.localizedDescription } }; return }
+        if let vorbis { Task { do { try await vorbis.seek(target); position = vorbis.currentTime; updateNowPlaying(); checkpoint() } catch { self.error = error.localizedDescription } }; return }
         audio?.currentTime = target
         position = audio?.currentTime ?? 0
         updateNowPlaying(); checkpoint()

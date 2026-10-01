@@ -15,6 +15,7 @@ struct MusicLibraryView: View {
     @EnvironmentObject private var player: MusicPlayer
     @EnvironmentObject private var pc: PCConnection
     @EnvironmentObject private var personal: PersonalLibrary
+    @EnvironmentObject private var routes: RouteCoordinator
     var downloadsOnly = false
     var playlistID: String?
     var favoritesOnly = false
@@ -24,6 +25,7 @@ struct MusicLibraryView: View {
     var localFiles = false
     var showRoot = true
     var externalQuery: String?
+    var coverID: String?
     @State private var selecting = false
     @State private var selected = Set<String>()
     @State private var removing = false
@@ -34,6 +36,7 @@ struct MusicLibraryView: View {
     @State private var remote: [PCTrack] = []
     @State private var newPlaylist = false
     @State private var renamePlaylist = false
+    @State private var editingOrder = false
     @State private var name = ""
     private var sort: LibrarySort { LibrarySort(rawValue: sortValue) ?? .title }
     private var playlist: PCPlaylist? { pc.collections.playlists.first { $0.id == playlistID } }
@@ -43,14 +46,17 @@ struct MusicLibraryView: View {
             if album != nil || artist != nil || orderedIDs != nil || favoritesOnly {
                 Section {
                     if let first = songs.first {
-                        HStack(spacing: 18) { CoverArtwork(id: first.syncID ?? first.id, size: 96); VStack(alignment: .leading, spacing: 8) { Text(album ?? artist ?? (favoritesOnly ? "Любимые треки" : "Музыка")).font(.headline).lineLimit(3); Text("\(songs.count) скачано · \(remote.count) на ПК").font(.caption).foregroundStyle(.secondary) } }.padding(.vertical, 12)
+                        HStack(spacing: 18) { CoverArtwork(id: coverID ?? first.syncID ?? first.id, size: 96); VStack(alignment: .leading, spacing: 8) { Text(album ?? artist ?? (favoritesOnly ? "Любимые треки" : "Музыка")).font(.headline).lineLimit(3); Text("\(songs.count) скачано · \(remote.count) на ПК").font(.caption).foregroundStyle(.secondary) } }.padding(.vertical, 12)
                     }
                     HStack {
                         Button("Слушать", systemImage: "play.fill") { if let first = songs.first { Task { await player.play(first, queue: songs, repository: library.repository) } } }.disabled(songs.isEmpty)
                         Button("Перемешать", systemImage: "shuffle") { let shuffled = songs.shuffled(); if let first = shuffled.first { Task { await player.play(first, queue: shuffled, repository: library.repository) } } }.disabled(songs.isEmpty)
                     }.buttonStyle(.glass)
+                    if favoritesOnly { Button("Создать плейлист из результата") { personal.update { $0.playlists.append(PersonalPlaylist(name:"Любимые треки",tracks:songs.map(\.id)+remote.map(\.id))) } } }
                     if !remote.isEmpty && !downloadsOnly { Button("Скачать оригиналы", systemImage: "arrow.down.circle") { pc.download(remote, library: library) } }
                     if let album { Button(personal.state.albums.contains(album) ? "Удалить из библиотеки" : "Сохранить альбом", systemImage: "plus.circle") { personal.update { if !$0.albums.insert(album).inserted { $0.albums.remove(album) } } } }
+                    if let album { ShareLink(item:MusicLinks.make("album",album)) { Label("Поделиться альбомом",systemImage:"square.and.arrow.up") }; Button("Код альбома",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("album",album)) } }
+                    if let artist { ShareLink(item:MusicLinks.make("artist",artist)) { Label("Поделиться исполнителем",systemImage:"square.and.arrow.up") } }
                     if let artist { Button(personal.state.artists.contains(artist) ? "Убрать исполнителя" : "Сохранить исполнителя", systemImage: "person.badge.plus") { personal.update { if !$0.artists.insert(artist).inserted { $0.artists.remove(artist) } } } }
                 }
             }
@@ -84,6 +90,8 @@ struct MusicLibraryView: View {
                         let ids = Set(playlist.tracks); pc.download(pc.tracks.filter { ids.contains($0.id) }, library: library)
                     }
                     Menu("Изменить плейлист", systemImage: "ellipsis") {
+                        Button("Редактировать треки и описание") { editingOrder = true }
+                        Button("Копия в личную библиотеку") { personal.update { $0.playlists.append(PersonalPlaylist(name:playlist.name + " — копия",tracks:playlist.tracks,description:playlist.description ?? "")) } }
                         Button("Переименовать") { name = playlist.name; renamePlaylist = true }
                         Button("Удалить плейлист", role: .destructive) { pc.edit(PCEdit(kind: "delete_playlist", playlist: playlistID)) }
                     }
@@ -102,6 +110,7 @@ struct MusicLibraryView: View {
                             NavigationLink { MusicLibraryView(artist:song.artist).navigationTitle(song.artist) } label: { Label("К исполнителю",systemImage:"person") }
                             NavigationLink { MusicLibraryView(album:"\(song.artist) — \(song.album)").navigationTitle(song.album) } label: { Label("К альбому",systemImage:"square.stack") }
                             ShareOriginalButton(song:song)
+                            Button("Код трека",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",song.syncID ?? song.id)) }
                             Button("Удалить копию с iPhone", role:.destructive) { selected = [song.id]; removing = true }
                         }
                     }
@@ -142,6 +151,7 @@ struct MusicLibraryView: View {
                 Button("Скачать альбом", systemImage: "arrow.down.circle") { pc.download(remote, library: library) }
             }
         }
+        .sheet(isPresented:$editingOrder) { PlaylistEditorView(id:playlistID ?? "", isPC:true) }
         .listStyle(.plain).scrollContentBackground(.hidden)
         .modifier(OptionalMusicSearch(query: $query, enabled: externalQuery == nil))
         .refreshable { await pc.refresh() }

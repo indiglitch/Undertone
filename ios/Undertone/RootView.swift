@@ -47,6 +47,7 @@ struct RootView: View {
     @EnvironmentObject private var pc: PCConnection
     @EnvironmentObject private var personal: PersonalLibrary
     @EnvironmentObject private var sharing: ShareCoordinator
+    @EnvironmentObject private var routes: RouteCoordinator
     @AppStorage("createTabVisible") private var createVisible = true
     @AppStorage("offlineMode") private var offline = false
     @State private var devicePresented = false
@@ -105,6 +106,8 @@ struct RootView: View {
         .sheet(isPresented:$creating) { CreateMusicView() }
         .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("Компьютер").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { devicePresented = false } } } } }
         .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
+        .sheet(item:$routes.route) { MusicRouteView(route:$0) }
+        .sheet(item:$routes.code) { MusicCodeView(url:$0.url) }
         .fileImporter(isPresented: $importer, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task { await library.importFiles(urls) }
@@ -113,11 +116,11 @@ struct RootView: View {
         }
         .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player).environmentObject(player.clock) }
         .alert("Не удалось завершить действие", isPresented: Binding(
-            get: { library.error != nil || player.error != nil || pc.error != nil || personal.error != nil },
-            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil } }
+            get: { library.error != nil || player.error != nil || pc.error != nil || personal.error != nil || routes.error != nil },
+            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil; routes.error = nil } }
         )) {
-            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil }
-        } message: { Text(library.error ?? player.error ?? pc.error ?? personal.error ?? "") }
+            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil; routes.error = nil }
+        } message: { Text(library.error ?? player.error ?? pc.error ?? personal.error ?? routes.error ?? "") }
     }
 
     private var home: some View {
@@ -292,6 +295,7 @@ struct PlayerView: View {
                                 ShareOriginalButton(song:song)
                             }.buttonStyle(.glass)
                             SongLyricsView()
+                            LocalVisualView()
                         }
                         Label("Доступно офлайн", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
                     }.padding(.horizontal, 26).padding(.bottom, 30).frame(maxWidth: .infinity)

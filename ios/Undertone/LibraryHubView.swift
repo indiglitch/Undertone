@@ -10,6 +10,8 @@ struct LibraryHubView: View {
     @AppStorage("libraryGrid") private var grid = false
     @State private var query = ""
     @State private var creating = false
+    @State private var renameID: String?
+    @State private var rename = ""
     private var folders: [LibraryFolder] { personal.state.folders.filter { $0.parent == folderID && matches($0.name) }.sorted { ordered("folder:" + $0.id,$0.name,"folder:" + $1.id,$1.name) } }
     private func matches(_ name: String) -> Bool { query.isEmpty || name.localizedCaseInsensitiveContains(query) }
     private func ordered(_ a: String,_ titleA: String,_ b: String,_ titleB: String) -> Bool {
@@ -36,6 +38,7 @@ struct LibraryHubView: View {
                         NavigationLink { LibraryHubView(folderID: folder.id).navigationTitle(folder.name) } label: { entry(folder.name, id: "folder:" + folder.id, icon: "folder") }
                         .contextMenu {
                             pin("folder:" + folder.id)
+                            Button("Переименовать") { rename = folder.name; renameID = folder.id }
                             Menu("Переместить") {
                                 Button("В корень") { personal.update { _ = $0.moveFolder(folder.id, to: nil) } }
                                 ForEach(personal.state.folders.filter { $0.id != folder.id }) { target in Button(target.name) { personal.update { _ = $0.moveFolder(folder.id, to: target.id) } } }
@@ -58,7 +61,7 @@ struct LibraryHubView: View {
             }
             if folderID == nil && (filter == "Всё" || filter == "Альбомы") {
                 Section("Сохранённые альбомы") {
-                    let albums = personal.state.albums.filter { matches($0) }.sorted()
+                    let albums = personal.state.albums.filter { matches($0) }.sorted { ordered("album:" + $0,$0,"album:" + $1,$1) }
                     if grid {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 130))], alignment: .leading, spacing: 18) {
                             ForEach(albums, id: \.self) { name in NavigationLink { MusicLibraryView(album: name).navigationTitle(name) } label: {
@@ -70,7 +73,7 @@ struct LibraryHubView: View {
                 }
             }
             if folderID == nil && (filter == "Всё" || filter == "Исполнители") {
-                Section("Исполнители") { ForEach(personal.state.artists.filter { matches($0) }.sorted(), id: \.self) { name in
+                Section("Исполнители") { ForEach(personal.state.artists.filter { matches($0) }.sorted { ordered("artist:" + $0,$0,"artist:" + $1,$1) }, id: \.self) { name in
                     NavigationLink { MusicLibraryView(artist: name).navigationTitle(name) } label: { entry(name,id: "artist:" + name,icon: "person") }.contextMenu { pin("artist:" + name) }
                 } }
             }
@@ -79,6 +82,11 @@ struct LibraryHubView: View {
         .searchable(text: $query, prompt: "Поиск в сохранённой библиотеке")
         .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(grid ? "Список" : "Сетка", systemImage: grid ? "list.bullet" : "square.grid.2x2") { grid.toggle() } } }
         .sheet(isPresented: $creating) { CreateMusicView(parent: folderID) }
+        .alert("Переименовать папку",isPresented:Binding(get:{renameID != nil},set:{if !$0 {renameID = nil}})) {
+            TextField("Название",text:$rename)
+            Button("Сохранить") { let title = rename.trimmingCharacters(in:.whitespacesAndNewlines); if !title.isEmpty, title.count <= 120 { personal.update { if let index = $0.folders.firstIndex(where:{$0.id == renameID}) { $0.folders[index].name = title } } }; renameID = nil }
+            Button("Отмена",role:.cancel) { renameID = nil }
+        }
     }
     private func entry(_ title: String,id: String,icon: String) -> some View {
         HStack { Label(title, systemImage: icon).lineLimit(2); Spacer(); if personal.state.pins.contains(id) { Image(systemName: "pin.fill").font(.caption).foregroundStyle(Color.undertone) } }.padding(.vertical, 6)
@@ -125,16 +133,18 @@ struct PersonalPlaylistView: View {
     @State private var name = ""
     @State private var description = ""
     @State private var confirmDelete = false
+    @State private var editingTracks = false
     @Environment(\.dismiss) private var dismiss
     private var playlist: PersonalPlaylist? { personal.state.playlists.first { $0.id == id } }
     var body: some View {
         Group {
             if let playlist {
-                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false)
+                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false, coverID:playlist.id.replacingOccurrences(of:"-",with:""))
                     .safeAreaInset(edge: .top) { HStack {
                         Text(playlist.description).font(.caption).lineLimit(2)
                         Spacer()
                         Menu("Изменить", systemImage: "ellipsis") {
+                            Button("Редактировать треки и обложку") { editingTracks = true }
                             Button("Название и описание") { name = playlist.name; description = playlist.description; editing = true }
                             Button("Удалить плейлист", role: .destructive) { confirmDelete = true }
                             ShareLink(item: playlist.name + "\n" + playlist.tracks.compactMap { id in library.songs.first(where: { $0.id == id || $0.sourceIDs.contains(id) })?.title ?? pc.tracks.first(where: { $0.id == id })?.title }.joined(separator: "\n")) { Label("Поделиться списком", systemImage: "square.and.arrow.up") }
@@ -142,6 +152,7 @@ struct PersonalPlaylistView: View {
                     }.padding(.horizontal) }
             } else { ContentUnavailableView("Плейлист удалён", systemImage: "music.note.list") }
         }
+        .sheet(isPresented:$editingTracks) { PlaylistEditorView(id:id,isPC:false) }
         .sheet(isPresented: $editing) { NavigationStack { Form {
             TextField("Название", text: $name); TextField("Описание", text: $description, axis: .vertical)
             Button("Сохранить") { personal.update { if let index = $0.playlists.firstIndex(where: { $0.id == id }) { $0.playlists[index].name = name.trimmingCharacters(in: .whitespacesAndNewlines); $0.playlists[index].description = description } }; editing = false }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 120)
@@ -156,10 +167,13 @@ struct MobileSearchView: View {
     @EnvironmentObject private var pc: PCConnection
     @State private var query = ""
     @State private var filter = "Песни"
+    @State private var scanning = false
+    @EnvironmentObject private var routes: RouteCoordinator
     private var albumNames: [String] { Set(pc.albums.keys).union(library.albums.keys).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
     private var artists: [String] { Set(pc.tracks.map(\.artist)).union(library.songs.map(\.artist)).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
     var body: some View {
         VStack(spacing: 0) {
+            Button("Сканировать код Undertone",systemImage:"qrcode.viewfinder") { scanning = true }.font(.caption).padding(.bottom,8)
             HStack { Image(systemName: "magnifyingglass"); TextField("Песня, альбом, исполнитель", text: $query).submitLabel(.search).onSubmit { personal.rememberSearch(query) }; if !query.isEmpty { Button("Очистить", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly) } }.padding(12).background(.white.opacity(0.06),in: RoundedRectangle(cornerRadius: 14)).padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(["Песни","Альбомы","Исполнители","Плейлисты"], id: \.self) { name in Button(name) { filter = name }.buttonStyle(.bordered).tint(filter == name ? .undertone : .gray) } }.padding() }
             if query.isEmpty && !personal.state.searches.isEmpty {
@@ -176,7 +190,7 @@ struct MobileSearchView: View {
                     }
                 }.listStyle(.plain).scrollContentBackground(.hidden)
             }
-        }
+        }.sheet(isPresented:$scanning) { QRScanner { code in scanning = false; if let url = URL(string:code) { routes.open(url) } }.ignoresSafeArea().overlay(alignment:.topTrailing) { Button("Закрыть") { scanning = false }.buttonStyle(.glass).padding(24) } }
     }
 }
 

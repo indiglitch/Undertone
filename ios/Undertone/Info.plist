@@ -18,4 +18,5 @@
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>LSSupportsOpeningDocumentsInPlace</key><true/>
   <key>UIFileSharingEnabled</key><false/>
+  <key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>local.undertone.music</string><key>CFBundleURLSchemes</key><array><string>undertone</string></array></dict></array>
 </dict></plist>

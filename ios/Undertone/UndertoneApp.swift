@@ -10,6 +10,7 @@ struct UndertoneApp: App {
     @StateObject private var pc = PCConnection()
     @StateObject private var personal = PersonalLibrary()
     @StateObject private var sharing = ShareCoordinator()
+    @StateObject private var routes = RouteCoordinator()
 
     var body: some Scene {
         WindowGroup {
@@ -20,6 +21,8 @@ struct UndertoneApp: App {
                 .environmentObject(downloads)
                 .environmentObject(personal)
                 .environmentObject(sharing)
+                .environmentObject(routes)
+                .onOpenURL { url in routes.open(url) }
                 .preferredColorScheme(.dark)
                 .tint(.undertone)
                 .task {

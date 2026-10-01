@@ -12,6 +12,7 @@ pub struct Playlist {
     pub id: String,
     pub name: String,
     pub tracks: Vec<String>,
+    pub description: String,
 }
 #[derive(Deserialize)]
 pub struct Operation {
@@ -22,6 +23,8 @@ pub struct Operation {
     pub playlist: Option<String>,
     pub name: Option<String>,
     pub tracks: Option<Vec<String>>,
+    pub expected_tracks: Option<Vec<String>>,
+    pub description: Option<String>,
 }
 fn valid_id(id: &str) -> bool {
     id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit())
@@ -29,14 +32,25 @@ fn valid_id(id: &str) -> bool {
 fn snapshot_connection(db: &Connection) -> rusqlite::Result<Snapshot> {
     let likes = db.prepare("SELECT i.sync_id FROM likes l JOIN track_identities i ON i.track_id=l.track_id ORDER BY i.sync_id")?
         .query_map([],|r|r.get(0))?.collect::<Result<Vec<String>,_>>()?;
+    let has_description = db
+        .prepare("PRAGMA table_info(playlists)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .filter_map(Result::ok)
+        .any(|name| name == "description");
+    let query = if has_description {
+        "SELECT sync_id,name,id,description FROM playlists ORDER BY sync_id"
+    } else {
+        "SELECT sync_id,name,id,'' FROM playlists ORDER BY sync_id"
+    };
     let mut playlists = db
-        .prepare("SELECT sync_id,name,id FROM playlists ORDER BY sync_id")?
+        .prepare(query)?
         .query_map([], |r| {
             Ok((
                 Playlist {
                     id: r.get(0)?,
                     name: r.get(1)?,
                     tracks: vec![],
+                    description: r.get(3)?,
                 },
                 r.get::<_, i64>(2)?,
             ))
@@ -119,6 +133,23 @@ pub fn apply(path: &PathBuf, operations: Vec<Operation>) -> Result<Snapshot, Str
                 let mut position:i64=tx.query_row("SELECT COALESCE(MAX(position),-1)+1 FROM playlist_tracks WHERE playlist_id=?1",[id],|r|r.get(0)).map_err(|e|e.to_string())?;
                 for track in tracks {tx.execute("INSERT INTO playlist_tracks(playlist_id,track_id,position) VALUES(?1,?2,?3)",params![id,track_id(track)?,position]).map_err(|e|e.to_string())?;position+=1;}
                 tx.execute("UPDATE playlists SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",[id])
+            },
+            "replace_tracks" => {
+                let id=playlist_id()?;
+                let expected=op.expected_tracks.as_ref().ok_or("Missing expected playlist order")?;
+                let current=tx.prepare("SELECT i.sync_id FROM playlist_tracks p JOIN track_identities i ON i.track_id=p.track_id WHERE p.playlist_id=?1 ORDER BY p.position,p.id").map_err(|e|e.to_string())?.query_map([id],|r|r.get::<_,String>(0)).map_err(|e|e.to_string())?.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
+                if &current!=expected { return Err("Playlist changed on PC; refresh before editing order".into()); }
+                let tracks=op.tracks.as_ref().ok_or("Missing tracks")?;
+                if tracks.len()>10000 { return Err("Too many tracks".into()); }
+                let ids=tracks.iter().map(|track|track_id(track)).collect::<Result<Vec<_>,_>>()?;
+                tx.execute("DELETE FROM playlist_tracks WHERE playlist_id=?1",[id]).map_err(|e|e.to_string())?;
+                for (position,track) in ids.iter().enumerate() { tx.execute("INSERT INTO playlist_tracks(playlist_id,track_id,position) VALUES(?1,?2,?3)",params![id,track,position as i64]).map_err(|e|e.to_string())?; }
+                tx.execute("UPDATE playlists SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",[id])
+            },
+            "describe_playlist" => {
+                let description=op.description.as_deref().ok_or("Missing description")?;
+                if description.chars().count()>2000 { return Err("Description too long".into()); }
+                tx.execute("UPDATE playlists SET description=?1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?2",params![description,playlist_id()?])
             },
             "remove_track" => {let id=playlist_id()?;tx.execute("DELETE FROM playlist_tracks WHERE playlist_id=?1 AND track_id=?2",params![id,track_id(track)?])},
             _ => return Err("Unknown edit".into()),

@@ -31,4 +31,12 @@ final class PersonalLibraryTests: XCTestCase {
         let removed = try await repo.removePhoneCopies([song]); let empty = try await repo.read(); XCTAssertTrue(empty.isEmpty); XCTAssertFalse(FileManager.default.fileExists(atPath:file.path)); let bytes = try await repo.trashSize(); XCTAssertEqual(bytes,4)
         try await repo.restorePhoneCopies(removed); XCTAssertEqual(try Data(contentsOf:file),original); let restored = try await repo.read(); XCTAssertEqual(restored,[song])
     }
+    func testMusicLinksNeverCarryPairingAndRejectForeignURLs() {
+        let url = MusicLinks.make("album","Artist — Album & more")
+        XCTAssertEqual(MusicLinks.parse(url)?.value,"Artist — Album & more")
+        XCTAssertNil(MusicLinks.parse(URL(string:"https://example.com/album")!))
+        XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album?id=test&token=secret")!))
+        XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album/path?id=test")!))
+    }
+
 }

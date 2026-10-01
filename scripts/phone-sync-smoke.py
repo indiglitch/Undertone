@@ -15,7 +15,8 @@ with tempfile.TemporaryDirectory(prefix='undertone-phone-test-') as temporary:
     identity = 'a' * 32
     connection.execute('INSERT INTO tracks VALUES(1,?,"Test song",1,1,0.1,"WAV",NULL)', (str(music),))
     connection.execute('INSERT INTO track_identities VALUES(1,?)', (identity,))
-    connection.executescript('CREATE TABLE likes(track_id INTEGER PRIMARY KEY);CREATE TABLE playlists(id INTEGER PRIMARY KEY,sync_id TEXT UNIQUE,name TEXT,updated_at TEXT);CREATE TABLE playlist_tracks(id INTEGER PRIMARY KEY,playlist_id INTEGER REFERENCES playlists(id) ON DELETE CASCADE,track_id INTEGER,position INTEGER);')
+    connection.executescript('CREATE TABLE likes(track_id INTEGER PRIMARY KEY);CREATE TABLE playlists(id INTEGER PRIMARY KEY,sync_id TEXT UNIQUE,name TEXT,updated_at TEXT,description TEXT NOT NULL DEFAULT "");CREATE TABLE playlist_tracks(id INTEGER PRIMARY KEY,playlist_id INTEGER REFERENCES playlists(id) ON DELETE CASCADE,track_id INTEGER,position INTEGER);')
+    connection.executescript('CREATE TABLE lyrics(track_id INTEGER PRIMARY KEY,plain_text TEXT); CREATE TABLE lyric_lines(track_id INTEGER,order_index INTEGER,timestamp_ms INTEGER,text TEXT); INSERT INTO lyrics VALUES(1,"Test lyrics"); INSERT INTO lyric_lines VALUES(1,0,1000,"Test line");')
     connection.commit(); connection.close()
     status_file = root / 'pairing.json'
     process = subprocess.Popen([str(exe), str(db), str(status_file)], stdout=subprocess.DEVNULL)
@@ -48,6 +49,11 @@ with tempfile.TemporaryDirectory(prefix='undertone-phone-test-') as temporary:
         status, headers, body = get('/v1/file/' + identity, pairing['token'])
         assert status == 200 and body == original
         assert headers['X-Content-SHA256'] == hashlib.sha256(original).hexdigest()
+        assert get('/v1/lyrics/' + identity)[0] == 401
+        lyric_status,_,lyric_body = get('/v1/lyrics/' + identity,pairing['token'])
+        assert lyric_status == 200 and json.loads(lyric_body) == {'plain':'Test lyrics','lines':[{'timestamp_ms':1000,'text':'Test line'}]}
+        assert get('/v1/lyrics/' + 'f'*32,pairing['token'])[0] == 404
+        assert get('/v1/lyrics/../../outside',pairing['token'])[0] == 404
         assert get('/v1/file/../../outside', pairing['token'])[0] == 404
         assert get('/v1/file/' + 'f' * 32, pairing['token'])[0] == 404
         status, headers, body = get('/v1/file/' + identity, pairing['token'], {'Range':'bytes=100-199'})
@@ -86,6 +92,13 @@ with tempfile.TemporaryDirectory(prefix='undertone-phone-test-') as temporary:
             assert get('/v1/library', pairing['token'])[0] == 200
             status, headers, body = get('/v1/file/' + identity, pairing['token'])
             assert status == 200 and body == original
+        playlist = snapshot['playlists'][0]
+        reordered = json.dumps([{'id':'d'*32,'kind':'replace_tracks','playlist':playlist['id'],'expected_tracks':playlist['tracks'],'tracks':[]},{'id':'e'*32,'kind':'describe_playlist','playlist':playlist['id'],'description':'Phone description'}]).encode()
+        status,_,data = get('/v1/collections',pairing['token'],{},reordered)
+        assert status == 200 and json.loads(data)['playlists'][0]['tracks'] == [] and json.loads(data)['playlists'][0]['description'] == 'Phone description'
+        assert get('/v1/collections',pairing['token'],{},reordered)[0] == 200, 'Reordering retry must be idempotent'
+        stale = json.dumps([{'id':'f'*32,'kind':'replace_tracks','playlist':playlist['id'],'expected_tracks':playlist['tracks'],'tracks':[identity]}]).encode()
+        assert get('/v1/collections',pairing['token'],{},stale)[0] == 409, 'Stale order must not overwrite PC edits'
         print('PASS: TLS/auth, ranges/resume, bidirectional collections, idempotent retry/rollback, original bytes, encrypted identity/restarts')
     finally:
         process.terminate(); process.wait(timeout=10)

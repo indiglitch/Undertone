@@ -26,7 +26,7 @@ actor CoverStore {
                 kCGImageSourceThumbnailMaxPixelSize: 640,
                 kCGImageSourceCreateThumbnailWithTransform: true,
                 kCGImageSourceShouldCacheImmediately: true
-              ] as CFDictionary), let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { return }
+              ] as CFDictionary), let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.85) else { throw PCError.rejected }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try jpeg.write(to: path(id), options: .atomic); memory.removeObject(forKey: id as NSString)
     }

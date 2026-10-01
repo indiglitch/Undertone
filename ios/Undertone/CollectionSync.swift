@@ -4,6 +4,7 @@ struct PCPlaylist: Codable, Identifiable, Sendable, Equatable {
     let id: String
     var name: String
     var tracks: [String]
+    var description: String? = nil
 }
 struct PCCollections: Codable, Sendable {
     var likes: [String] = []
@@ -21,6 +22,10 @@ struct PCCollections: Codable, Sendable {
         case "delete_playlist": playlists.removeAll { $0.id == edit.playlist }
         case "add_tracks":
             if let index = playlists.firstIndex(where: { $0.id == edit.playlist }) { playlists[index].tracks += edit.tracks ?? [] }
+        case "replace_tracks":
+            if let index = playlists.firstIndex(where: { $0.id == edit.playlist }) { playlists[index].tracks = edit.tracks ?? [] }
+        case "describe_playlist":
+            if let index = playlists.firstIndex(where: { $0.id == edit.playlist }) { playlists[index].description = edit.description }
         case "remove_track":
             if let index = playlists.firstIndex(where: { $0.id == edit.playlist }) { playlists[index].tracks.removeAll { $0 == edit.track } }
         default: break
@@ -35,6 +40,8 @@ struct PCEdit: Codable, Sendable, Identifiable {
     var playlist: String?
     var name: String?
     var tracks: [String]?
+    var expected_tracks: [String]? = nil
+    var description: String? = nil
 }
 struct PCStoredState: Codable, Sendable {
     var collections = PCCollections()
