@@ -39,7 +39,7 @@ final class PersonalLibraryTests: XCTestCase {
         XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album/path?id=test")!))
     }
 
-    @MainActor func testNativePlayerRestoresPausedWithoutRecordingAPlay() async throws {
+    @MainActor func testNativePlayerRestoresPausedThenTransitionsWithCrossfade() async throws {
         let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }
         let repo = LibraryRepository(root:directory), storage = PlayerStorage(root:directory)
         var bytes = Data()
@@ -52,6 +52,10 @@ final class PersonalLibraryTests: XCTestCase {
         let player = MusicPlayer(storage:storage); var plays = 0; player.onTrack = { _ in plays += 1 }
         await player.restore([song],repository:repo)
         XCTAssertEqual(player.current?.id,song.id); XCTAssertFalse(player.playing); XCTAssertEqual(player.position,0.3,accuracy:0.03); XCTAssertEqual(player.repeatMode,.all); XCTAssertEqual(plays,0)
+        bytes[bytes.count-1] = 1; let secondSource = directory.appendingPathComponent("second.wav"); try bytes.write(to:secondSource); let second = try await repo.importFile(secondSource)
+        await player.play(song,queue:[song,second],repository:repo); XCTAssertTrue(player.playing)
+        await player.advance(1,fadeDuration:0.05); XCTAssertEqual(player.current?.id,second.id); XCTAssertTrue(player.playing)
+        player.pause(); XCTAssertFalse(player.playing)
     }
 
 }

@@ -74,6 +74,7 @@ final class BackgroundDownloads: ObservableObject {
     @Published private(set) var records: [DownloadRecord] = []
     @Published private(set) var received: Int64 = 0
     @Published private(set) var completed = 0
+    private(set) var canceledIDs = Set<String>()
     @Published var error: String?
     var onInstall: (() async -> Void)?
     var backgroundCompletion: (() -> Void)?
@@ -129,6 +130,7 @@ final class BackgroundDownloads: ObservableObject {
     }
     func enqueue(_ tracks: [PCTrack], installed: Set<String>) async {
         await initialize()
+        canceledIDs.subtract(tracks.map(\.id))
         let existing = Set(records.map(\.id))
         records += tracks.filter { !installed.contains($0.id) && !existing.contains($0.id) }.map { DownloadRecord(track: $0) }
         await save(); await schedule()
@@ -207,9 +209,18 @@ final class BackgroundDownloads: ObservableObject {
         for index in records.indices where ["paused", "failed"].contains(records[index].state) && records[index].taskID == nil { records[index].state = "queued" }
         await save(); await schedule()
     }
+    func cancel(_ id: String) async {
+        canceledIDs.insert(id)
+        let tasks = transfers.values.filter { $0.taskDescription == id }
+        for task in tasks { transfers.removeValue(forKey:task.taskIdentifier) }
+        records.removeAll { $0.id == id }; await save(); tasks.forEach { $0.cancel() }; try? await persistence.setResume(id,data:nil); await schedule()
+    }
+    func retry(_ id: String) async {
+        if let index = records.firstIndex(where: { $0.id == id && $0.taskID == nil }) { records[index].state = "queued"; await save(); await schedule() }
+    }
     func cancelAll() async {
         let tasks = Array(transfers.values); transfers.removeAll()
-        let ids = records.map(\.id); records = []; await save()
+        let ids = records.map(\.id); canceledIDs.formUnion(ids); records = []; await save()
         tasks.forEach { $0.cancel() }
         for id in ids { try? await persistence.setResume(id, data: nil) }
     }

@@ -218,10 +218,26 @@ struct RemoteTrack {
     format: String,
     size: u64,
     has_cover: bool,
+    track_number: Option<i64>,
+    year: Option<i64>,
 }
 fn catalog(path: &PathBuf) -> Result<Vec<RemoteTrack>, String> {
     let db = database(path).map_err(|e| e.to_string())?;
-    let mut statement = db.prepare("SELECT i.sync_id,t.title,a.name,b.title,t.duration,t.format,t.path,t.cover IS NOT NULL FROM tracks t JOIN track_identities i ON i.track_id=t.id JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id ORDER BY t.title").map_err(|e| e.to_string())?;
+    let number = if db
+        .prepare("SELECT track_number FROM tracks LIMIT 0")
+        .is_ok()
+    {
+        "t.track_number"
+    } else {
+        "NULL"
+    };
+    let year = if db.prepare("SELECT year FROM tracks LIMIT 0").is_ok() {
+        "t.year"
+    } else {
+        "NULL"
+    };
+    let query = format!("SELECT i.sync_id,t.title,a.name,b.title,t.duration,t.format,t.path,t.cover IS NOT NULL,{number},{year} FROM tracks t JOIN track_identities i ON i.track_id=t.id JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id ORDER BY t.title");
+    let mut statement = db.prepare(&query).map_err(|e| e.to_string())?;
     let rows = statement
         .query_map([], |r| {
             Ok((
@@ -234,6 +250,8 @@ fn catalog(path: &PathBuf) -> Result<Vec<RemoteTrack>, String> {
                     format: r.get(5)?,
                     size: 0,
                     has_cover: r.get(7)?,
+                    track_number: r.get(8)?,
+                    year: r.get(9)?,
                 },
                 r.get::<_, String>(6)?,
             ))

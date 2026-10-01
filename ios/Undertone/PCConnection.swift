@@ -29,6 +29,8 @@ struct PCTrack: Codable, Identifiable, Sendable, Equatable {
     let format: String
     let size: Int64
     var has_cover: Bool? = nil
+    var track_number: Int? = nil
+    var year: Int? = nil
     var id: String { sync_id }
 }
 struct PCCatalog: Codable, Sendable { let version: Int; let tracks: [PCTrack] }
@@ -148,7 +150,7 @@ final class PCConnection: ObservableObject {
     }
     func offlineChanged(_ offline: Bool) {
         generation += 1
-        if offline { deactivate(); session?.invalidateAndCancel(); session = nil; online = false }
+        if offline { playbackRequest = UUID(); pendingPlayback = nil; deactivate(); session?.invalidateAndCancel(); session = nil; online = false }
         else if let pairing { configure(pairing); activate() }
     }
     func deactivate() { discovery.stop(); refreshTask?.cancel(); refreshTask = nil }
@@ -267,9 +269,9 @@ final class PCConnection: ObservableObject {
         defer { if playbackRequest == request { pendingPlayback = nil } }
         await BackgroundDownloads.shared.prioritize(track,installed:library.installedIDs)
         for _ in 0..<1800 {
-            guard playbackRequest == request,!Task.isCancelled else { return }
+            guard playbackRequest == request,!Task.isCancelled,!BackgroundDownloads.shared.canceledIDs.contains(track.id) else { return }
             if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { await player.play(song,queue:library.sortedSongs,repository:library.repository); return }
-            if BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "failed" { error = BackgroundDownloads.shared.error ?? "Не удалось скачать трек."; return }
+            if BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "failed" || BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "paused" { error = BackgroundDownloads.shared.error ?? "Не удалось скачать трек."; return }
             do { try await Task.sleep(for:.milliseconds(100)) } catch { return }
         }
         error = "Трек ещё загружается. Он будет доступен в библиотеке после завершения."

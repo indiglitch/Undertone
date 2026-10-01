@@ -26,6 +26,7 @@ struct MusicLibraryView: View {
     var showRoot = true
     var externalQuery: String?
     var coverID: String?
+    var personalPlaylistID: String?
     @State private var selecting = false
     @State private var selected = Set<String>()
     @State private var removing = false
@@ -110,6 +111,7 @@ struct MusicLibraryView: View {
                             Menu("В личный плейлист") { ForEach(personal.state.playlists) { playlist in Button(playlist.name) { personal.update { if let index = $0.playlists.firstIndex(where: { $0.id == playlist.id }), !$0.playlists[index].tracks.contains(song.id) { $0.playlists[index].tracks.append(song.id) } } } } }
                             NavigationLink { MusicLibraryView(artist:song.artist).navigationTitle(song.artist) } label: { Label("К исполнителю",systemImage:"person") }
                             NavigationLink { MusicLibraryView(album:"\(song.artist) — \(song.album)").navigationTitle(song.album) } label: { Label("К альбому",systemImage:"square.stack") }
+                            if let personalPlaylistID { Button("Убрать из плейлиста",role:.destructive) { personal.update { if let index = $0.playlists.firstIndex(where:{$0.id == personalPlaylistID}) { $0.playlists[index].tracks.removeAll { $0 == song.id || song.sourceIDs.contains($0) } } } } }
                             ShareOriginalButton(song:song)
                             Button("Код трека",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",song.syncID ?? song.id)) }
                             Button("Удалить копию с iPhone", role:.destructive) { selected = [song.id]; removing = true }
@@ -149,6 +151,7 @@ struct MusicLibraryView: View {
                     }
                 }
             }
+            if let artist { Section("Альбомы исполнителя") { ForEach(Array(Set(pc.albums.keys).union(library.albums.keys)).filter { $0.hasPrefix(artist + " — ") }.sorted(),id:\.self) { key in NavigationLink { MusicLibraryView(album:key).navigationTitle(key) } label: { Text(key) } } } }
             if album != nil && !remote.isEmpty {
                 Button("Скачать альбом", systemImage: "arrow.down.circle") { pc.download(remote, library: library) }
             }
@@ -183,8 +186,12 @@ struct MusicLibraryView: View {
                     return (playlistTracks.compactMap { localMap[$0] }.filter { matches($0.title, $0.artist, $0.album) },
                         playlistTracks.filter { !installed.contains($0) }.compactMap { pcMap[$0] }.filter { matches($0.title, $0.artist, $0.album) })
                 }
-                return (sort.sorted(local.filter { (!localFiles || $0.sourceIDs.isEmpty) && (!favorites || likes.contains($0.id) || !$0.sourceIDs.isDisjoint(with: likes)) && matches($0.title, $0.artist, $0.album) }),
-                    sort.sorted(tracks.filter { !localFiles && !installed.contains($0.id) && (!favorites || likes.contains($0.id)) && matches($0.title, $0.artist, $0.album) }))
+                let localMatches = local.filter { (!localFiles || $0.sourceIDs.isEmpty) && (!favorites || likes.contains($0.id) || !$0.sourceIDs.isDisjoint(with: likes)) && matches($0.title, $0.artist, $0.album) }
+                let remoteMatches = tracks.filter { !localFiles && !installed.contains($0.id) && (!favorites || likes.contains($0.id)) && matches($0.title, $0.artist, $0.album) }
+                if album != nil {
+                    return (localMatches.sorted { ($0.trackNumber ?? Int.max) == ($1.trackNumber ?? Int.max) ? $0.title.localizedStandardCompare($1.title) == .orderedAscending : ($0.trackNumber ?? Int.max) < ($1.trackNumber ?? Int.max) },remoteMatches.sorted { ($0.track_number ?? Int.max) == ($1.track_number ?? Int.max) ? $0.title.localizedStandardCompare($1.title) == .orderedAscending : ($0.track_number ?? Int.max) < ($1.track_number ?? Int.max) })
+                }
+                return (sort.sorted(localMatches),sort.sorted(remoteMatches))
             }.value
             guard !Task.isCancelled else { return }; songs = result.0; remote = result.1
         }
@@ -244,6 +251,14 @@ struct DownloadStatus: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(downloads.title ?? "Загрузки приостановлены").font(.headline).lineLimit(2)
                 Text("Осталось: \(downloads.records.count) · Готово: \(downloads.completed)").font(.caption).foregroundStyle(.secondary)
+                DisclosureGroup("Список загрузок") {
+                    ForEach(Array(downloads.records.prefix(30))) { record in HStack {
+                        VStack(alignment:.leading) { Text(record.track.title).font(.caption).lineLimit(1); Text(["queued":"В очереди","downloading":"Загрузка","installing":"Проверка оригинала","paused":"Приостановлено","failed":"Ошибка"][record.state] ?? record.state).font(.caption2).foregroundStyle(.secondary) }
+                        Spacer()
+                        if ["paused","failed"].contains(record.state) { Button("Повторить",systemImage:"arrow.clockwise") { Task { await downloads.retry(record.id) } }.labelStyle(.iconOnly) }
+                        Button("Отменить",systemImage:"xmark") { Task { await downloads.cancel(record.id) } }.labelStyle(.iconOnly)
+                    } }
+                }
                 Text("Можно заблокировать iPhone. Для передачи ПК должен работать, а телефон — оставаться в Wi-Fi.").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button(downloads.active ? "Приостановить" : "Продолжить") { Task { if downloads.active { await downloads.pause() } else { await downloads.resume() } } }

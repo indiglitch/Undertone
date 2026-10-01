@@ -139,7 +139,7 @@ struct PersonalPlaylistView: View {
     var body: some View {
         Group {
             if let playlist {
-                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false, coverID:playlist.id.replacingOccurrences(of:"-",with:""))
+                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false, coverID:playlist.id.replacingOccurrences(of:"-",with:""),personalPlaylistID:playlist.id)
                     .safeAreaInset(edge: .top) { HStack {
                         Text(playlist.description).font(.caption).lineLimit(2)
                         Spacer()

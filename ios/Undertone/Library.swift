@@ -15,6 +15,8 @@ struct Song: Codable, Identifiable, Equatable, Sendable {
     let format: String
     let addedAt: Date
     var syncIDs: [String]? = nil
+    var trackNumber: Int? = nil
+    var year: Int? = nil
     var sourceIDs: Set<String> { Set(syncIDs ?? []).union(syncID.map { [$0] } ?? []) }
 }
 
@@ -174,7 +176,7 @@ actor LibraryRepository {
         songs = try read()
         let aliases = (songs.first(where: { $0.id == expectedHash.lowercased() })?.sourceIDs ?? []).union([track.id])
         let song = Song(id: expectedHash.lowercased(), syncID: track.id, filename: filename, title: track.title, artist: track.artist,
-                        album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date(), syncIDs: aliases.sorted())
+                        album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date(), syncIDs: aliases.sorted(),trackNumber:track.track_number,year:track.year)
         songs.removeAll { $0.id == song.id || $0.syncID == track.id }; songs.append(song)
         try write(songs)
     }
