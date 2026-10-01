@@ -74,12 +74,13 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { [weak self] _ in
             guard let self, self.playing else { return }
             self.position = self.audio?.currentTime ?? self.vorbis?.currentTime ?? 0
-            let fade = UserDefaults.standard.double(forKey:"crossfadeSeconds")
+            let next: Song? = self.repeatMode == .one ? self.playbackQueue.current :
+                self.playbackQueue.songs.indices.contains(self.playbackQueue.index + 1) ? self.playbackQueue.songs[self.playbackQueue.index + 1] : self.repeatMode == .all ? self.playbackQueue.songs.first : nil
+            let fade = CrossfadePolicy.duration(requested:UserDefaults.standard.double(forKey:"crossfadeSeconds"),current:self.duration,next:next?.duration ?? 0)
             if fade > 0, let audio = self.audio, self.vorbis == nil, !self.transitioning,
-               self.duration > fade + 1, self.duration - audio.currentTime <= min(12,fade),
-               self.playbackQueue.index + 1 < self.playbackQueue.songs.count || self.repeatMode != .off {
+               self.duration > fade + 1, self.duration - audio.currentTime <= fade {
                 self.transitioning = true
-                Task { await self.advance(1,automatic:true,fadeDuration:min(12,fade)); self.transitioning = false }
+                Task { await self.advance(1,automatic:true,fadeDuration:fade); self.transitioning = false }
             }
             if Date().timeIntervalSince(self.lastCheckpoint) >= 5 { self.lastCheckpoint = Date(); self.checkpoint() }
         }
@@ -203,6 +204,16 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func removeUpcoming(_ offsets: IndexSet) { playbackQueue.removeUpcoming(offsets); checkpoint() }
     func moveUpcoming(_ offsets: IndexSet, to destination: Int) { playbackQueue.moveUpcoming(offsets, to: destination); checkpoint() }
     func clearUpcoming() { playbackQueue.clearUpcoming(); checkpoint() }
+    func forgetFiles(_ ids: Set<String>) {
+        if let current, ids.contains(current.id) {
+            pause(); audio?.stop(); audio = nil; vorbis?.stop(); vorbis = nil
+            self.current = nil; position = 0; duration = 0
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            let previous = sessionSave
+            sessionSave = Task { await previous?.value; do { try await sessionStorage.clear() } catch { self.error = error.localizedDescription } }
+        }
+        playbackQueue.removeFiles(ids); checkpoint()
+    }
     func shuffleUpcoming() { playbackQueue.shuffleUpcoming(); checkpoint() }
     func cycleRepeat() {
         playbackQueue.mode = repeatMode == .off ? .all : repeatMode == .all ? .one : .off

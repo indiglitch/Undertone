@@ -58,4 +58,11 @@ final class PersonalLibraryTests: XCTestCase {
         player.pause(); XCTAssertFalse(player.playing)
     }
 
+    func testCrossfadeDoesNotCutLongTailForShortNextTrack() {
+        XCTAssertEqual(CrossfadePolicy.duration(requested:12,current:240,next:4),2)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:4,current:240,next:180),4)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:12,current:240,next:0),0)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:.nan,current:240,next:4),0)
+    }
+
 }

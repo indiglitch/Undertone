@@ -83,6 +83,9 @@ actor PlayerStorage {
         guard FileManager.default.fileExists(atPath: path.path) else { return nil }
         return try JSONDecoder().decode(PlayerSnapshot.self, from: Data(contentsOf: path))
     }
+    func clear() throws {
+        if FileManager.default.fileExists(atPath:path.path) { try FileManager.default.removeItem(at:path) }
+    }
     func save(_ state: PlayerSnapshot) throws {
         try FileManager.default.createDirectory(at: path.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(state).write(to: path, options: .atomic)

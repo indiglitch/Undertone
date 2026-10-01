@@ -53,6 +53,12 @@ struct PlaybackQueue {
         songs = Array(songs.prefix(index + 1)) + tail
     }
     mutating func clearUpcoming() { songs = Array(songs.prefix(index + 1)) }
+    mutating func removeFiles(_ ids: Set<String>) {
+        let retainedCurrent = current?.id
+        let preceding = songs.prefix(index).filter { !ids.contains($0.id) }.count
+        songs.removeAll { ids.contains($0.id) }
+        index = retainedCurrent.flatMap { id in songs.firstIndex { $0.id == id } } ?? min(preceding, max(0, songs.count - 1))
+    }
     mutating func shuffleUpcoming() { songs = Array(songs.prefix(index + 1)) + upcoming.shuffled() }
 }
 
@@ -82,5 +88,12 @@ enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
             let title = a.title.localizedStandardCompare(b.title)
             return title == .orderedSame ? a.id < b.id : title == .orderedAscending
         }
+    }
+}
+
+enum CrossfadePolicy {
+    static func duration(requested: Double,current: Double,next: Double) -> Double {
+        guard requested.isFinite,current.isFinite,next.isFinite,requested > 0,current > 0,next > 0 else { return 0 }
+        return min(12,requested,current/2,next/2)
     }
 }

@@ -50,11 +50,11 @@ struct LibraryHubView: View {
                 Section("Плейлисты") {
                     ForEach(personal.state.playlists.filter { personal.state.playlistFolders[$0.id] == folderID && matches($0.name) }.sorted { ordered($0.id,$0.name,$1.id,$1.name) }) { playlist in
                         NavigationLink { PersonalPlaylistView(id: playlist.id).navigationTitle(playlist.name) } label: { entry(playlist.name, id: playlist.id, icon: "music.note.list") }
-                        .contextMenu { pin(playlist.id); folderPicker(playlist.id) }
+                        .contextMenu { pin(playlist.id); folderPicker(playlist.id) }.modifier(LibraryPinSwipe(id:playlist.id))
                     }
                     ForEach(pc.collections.playlists.filter { personal.state.playlistFolders[$0.id] == folderID && matches($0.name) }.sorted { ordered($0.id,$0.name,$1.id,$1.name) }) { playlist in
                         NavigationLink { MusicLibraryView(playlistID: playlist.id).navigationTitle(playlist.name) } label: { entry(playlist.name, id: playlist.id, icon: "desktopcomputer") }
-                        .contextMenu { pin(playlist.id); folderPicker(playlist.id) }
+                        .contextMenu { pin(playlist.id); folderPicker(playlist.id) }.modifier(LibraryPinSwipe(id:playlist.id))
                     }
                     Button("Создать", systemImage: "plus") { creating = true }
                 }
@@ -68,13 +68,13 @@ struct LibraryHubView: View {
                                 VStack(alignment: .leading) { CoverArtwork(id: library.albums[name]?.first.map { $0.syncID ?? $0.id } ?? pc.albums[name]?.first?.id, size: 120); Text(name).font(.caption).lineLimit(2) }
                             } }
                         }
-                    } else { ForEach(albums, id: \.self) { name in NavigationLink { MusicLibraryView(album: name).navigationTitle(name) } label: { entry(name,id: "album:" + name, icon: "square.stack") }.contextMenu { pin("album:" + name) } } }
+                    } else { ForEach(albums, id: \.self) { name in NavigationLink { MusicLibraryView(album: name).navigationTitle(name) } label: { entry(name,id: "album:" + name, icon: "square.stack") }.contextMenu { pin("album:" + name) }.modifier(LibraryPinSwipe(id:"album:" + name)) } }
                     if albums.isEmpty { Text("Сохрани альбом со страницы альбома").font(.caption).foregroundStyle(.secondary) }
                 }
             }
             if folderID == nil && (filter == "Всё" || filter == "Исполнители") {
                 Section("Исполнители") { ForEach(personal.state.artists.filter { matches($0) }.sorted { ordered("artist:" + $0,$0,"artist:" + $1,$1) }, id: \.self) { name in
-                    NavigationLink { MusicLibraryView(artist: name).navigationTitle(name) } label: { entry(name,id: "artist:" + name,icon: "person") }.contextMenu { pin("artist:" + name) }
+                    NavigationLink { MusicLibraryView(artist: name).navigationTitle(name) } label: { entry(name,id: "artist:" + name,icon: "person") }.contextMenu { pin("artist:" + name) }.modifier(LibraryPinSwipe(id:"artist:" + name))
                 } }
             }
         }
@@ -139,7 +139,7 @@ struct PersonalPlaylistView: View {
     var body: some View {
         Group {
             if let playlist {
-                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false, coverID:playlist.id.replacingOccurrences(of:"-",with:""),personalPlaylistID:playlist.id)
+                MusicLibraryView(orderedIDs: playlist.tracks, showRoot: false, coverID:playlist.id.replacingOccurrences(of:"-",with:""),personalPlaylistID:playlist.id,displayTitle:playlist.name)
                     .safeAreaInset(edge: .top) { HStack {
                         Text(playlist.description).font(.caption).lineLimit(2)
                         Spacer()
@@ -197,4 +197,10 @@ struct MobileSearchView: View {
 struct RecentListeningView: View {
     @EnvironmentObject private var personal: PersonalLibrary
     var body: some View { MusicLibraryView(downloadsOnly: true, orderedIDs: personal.state.recents, showRoot: false).navigationTitle("Недавно слушали") }
+}
+
+private struct LibraryPinSwipe: ViewModifier {
+    @EnvironmentObject private var personal: PersonalLibrary
+    let id: String
+    func body(content: Content) -> some View { content.swipeActions(edge:.leading) { Button { personal.togglePin(id) } label: { Label(personal.state.pins.contains(id) ? "Открепить" : "Закрепить",systemImage:"pin") }.tint(.undertone) } }
 }

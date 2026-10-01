@@ -27,6 +27,7 @@ struct MusicLibraryView: View {
     var externalQuery: String?
     var coverID: String?
     var personalPlaylistID: String?
+    var displayTitle: String?
     @State private var selecting = false
     @State private var selected = Set<String>()
     @State private var removing = false
@@ -45,11 +46,16 @@ struct MusicLibraryView: View {
     private var isRoot: Bool { showRoot && playlistID == nil && !favoritesOnly && album == nil && artist == nil && orderedIDs == nil }
     var body: some View {
         List {
-            if album != nil || artist != nil || orderedIDs != nil || favoritesOnly {
+            if album != nil || artist != nil || orderedIDs != nil || favoritesOnly || playlistID != nil {
                 Section {
-                    if let first = songs.first {
-                        HStack(spacing: 18) { CoverArtwork(id: coverID ?? first.syncID ?? first.id, size: 96); VStack(alignment: .leading, spacing: 8) { Text(album ?? artist ?? (favoritesOnly ? "Любимые треки" : "Музыка")).font(.headline).lineLimit(3); Text("\(songs.count) скачано · \(remote.count) на ПК").font(.caption).foregroundStyle(.secondary) } }.padding(.vertical, 12)
-                    }
+                    HStack(spacing:18) {
+                        CoverArtwork(id:coverID ?? playlistID ?? songs.first.map { $0.syncID ?? $0.id } ?? remote.first?.id,size:96)
+                        VStack(alignment:.leading,spacing:8) {
+                            Text(displayTitle ?? album ?? artist ?? playlist?.name ?? (favoritesOnly ? "Любимые треки" : "Музыка")).font(.headline).lineLimit(3)
+                            Text("\(songs.count) скачано · \(remote.count) на ПК").font(.caption).foregroundStyle(.secondary)
+                            if album != nil, let year = songs.compactMap(\.year).first ?? remote.compactMap(\.year).first { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }.padding(.vertical,12)
                     HStack {
                         Button("Слушать", systemImage: "play.fill") { if let first = songs.first { Task { await player.play(first, queue: songs, repository: library.repository) } } }.disabled(songs.isEmpty)
                         Button("Перемешать", systemImage: "shuffle") { let shuffled = songs.shuffled(); if let first = shuffled.first { Task { await player.play(first, queue: shuffled, repository: library.repository) } } }.disabled(songs.isEmpty)
@@ -112,6 +118,9 @@ struct MusicLibraryView: View {
                             NavigationLink { MusicLibraryView(artist:song.artist).navigationTitle(song.artist) } label: { Label("К исполнителю",systemImage:"person") }
                             NavigationLink { MusicLibraryView(album:"\(song.artist) — \(song.album)").navigationTitle(song.album) } label: { Label("К альбому",systemImage:"square.stack") }
                             if let personalPlaylistID { Button("Убрать из плейлиста",role:.destructive) { personal.update { if let index = $0.playlists.firstIndex(where:{$0.id == personalPlaylistID}) { $0.playlists[index].tracks.removeAll { $0 == song.id || song.sourceIDs.contains($0) } } } } }
+                            NavigationLink { Form {
+                                LabeledContent("Название",value:song.title); LabeledContent("Исполнитель",value:song.artist); LabeledContent("Альбом",value:song.album); LabeledContent("Формат",value:song.format); LabeledContent("Размер",value:ByteCountFormatter.string(fromByteCount:song.size,countStyle:.file)); LabeledContent("Длительность",value:String(format:"%.0f с",song.duration)); if let number = song.trackNumber { LabeledContent("Номер в альбоме",value:String(number)) }; if let year = song.year { LabeledContent("Год",value:String(year)) }
+                            }.navigationTitle("Сведения о файле") } label: { Label("Сведения о файле",systemImage:"info.circle") }
                             ShareOriginalButton(song:song)
                             Button("Код трека",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",song.syncID ?? song.id)) }
                             Button("Удалить копию с iPhone", role:.destructive) { selected = [song.id]; removing = true }
@@ -160,10 +169,10 @@ struct MusicLibraryView: View {
         .listStyle(.plain).scrollContentBackground(.hidden)
         .modifier(OptionalMusicSearch(query: $query, enabled: externalQuery == nil))
         .refreshable { await pc.refresh() }
-        .confirmationDialog("Удалить выбранные копии с iPhone? Оригиналы на ПК останутся.",isPresented:$removing) { Button("Удалить с iPhone",role:.destructive) { let removing = songs.filter { selected.contains($0.id) }; if removing.contains(where: { $0.id == player.current?.id }) { player.pause() }; Task { await library.removeCopies(removing) }; selected = [] } }
+        .confirmationDialog("Удалить выбранные копии с iPhone? Оригиналы на ПК останутся.",isPresented:$removing) { Button("Удалить с iPhone",role:.destructive) { let removing = songs.filter { selected.contains($0.id) }; Task { await library.removeCopies(removing); player.forgetFiles(Set(removing.map(\.id)).subtracting(library.sortedSongs.map(\.id))) }; selected = [] } }
         .toolbar {
             ToolbarItem(placement:.topBarTrailing) { Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } }
-            if playlistID == nil {
+            if playlistID == nil && orderedIDs == nil && album == nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("Сортировка", systemImage: "arrow.up.arrow.down") {
                         Picker("Сортировка", selection: $sortValue) { ForEach(LibrarySort.allCases) { Text($0.title).tag($0.rawValue) } }

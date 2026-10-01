@@ -1,5 +1,9 @@
 # Undertone for iPhone — native companion
 
+## Version 0.5 — personal-player specification adaptation
+
+Home/Search/Library/optional Create; private playlists/nested folders/pins/bookmarks; playlist order/description editing with PC conflict detection; bulk phone-copy removal/undo; private links/QR and original export; cached/imported synchronized lyrics; user-provided video; explicit offline mode; persisted paused player restoration and system-decoder crossfade. Coverage and remaining requirements: `docs/mobile/01-feature-matrix.md`. Social/accounts excluded by user. Browser preview is a separate demo counterpart, not an iOS emulator.
+
 Native SwiftUI client, deployment target iOS 26+. Uses the system Liquid Glass APIs rather than a web/CSS imitation. The requested iOS 27.0.1 device must be tested separately; no device compatibility result is implied by the deployment target.
 
 ## Version 0.3
@@ -57,4 +61,4 @@ References: [Liquid Glass](https://developer.apple.com/documentation/technologyo
 
 ## 0.4 playback convenience
 
-Queue sheet: play next, append, reorder/remove upcoming tracks, clear upcoming, shuffle remaining tracks, repeat track/all. Queue is session-local; repeated additions move the existing entry rather than duplicate it. Manual Next bypasses repeat-one. Library sorting persists in UserDefaults; playlists retain their PC order. Recently added sorts local downloads/imports by added-at; the PC catalog has no timestamp and keeps its supplied order. Deferred physical-device checks are recorded in reports/IOS_DEVICE_CHECKS_LATER.md.
+Queue sheet: play next, append, reorder/remove upcoming tracks, clear upcoming, shuffle remaining tracks, repeat track/all. Version 0.5 persists the queue/position and restores paused; repeated additions move the existing entry rather than duplicate it. Manual Next bypasses repeat-one. Library sorting persists in UserDefaults; playlists retain their PC order. Recently added sorts local downloads/imports by added-at; the PC catalog has no timestamp and keeps its supplied order. Deferred physical-device checks are recorded in reports/IOS_DEVICE_CHECKS_LATER.md.

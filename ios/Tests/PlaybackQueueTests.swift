@@ -57,4 +57,14 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertEqual(queue.current?.id, "a")
         XCTAssertEqual(queue.advance(1, automatic: false)?.id, "b")
     }
+    func testRemovingFilesPreservesSurvivingCurrentAndDropsDeletedQueueEntries() {
+        var queue = PlaybackQueue()
+        queue.replace([song("a"),song("b"),song("c"),song("d")],selected:song("b"))
+        queue.removeFiles(["a","c"])
+        XCTAssertEqual(queue.current?.id,"b")
+        XCTAssertEqual(queue.upcoming.map(\.id),["d"])
+        queue.removeFiles(["b","d"])
+        XCTAssertNil(queue.current)
+        XCTAssertTrue(queue.songs.isEmpty)
+    }
 }

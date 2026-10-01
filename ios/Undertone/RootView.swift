@@ -130,8 +130,8 @@ struct RootView: View {
                 Text("Твоя музыка.\nВсегда рядом.").font(.system(.largeTitle, design: .rounded).bold()).tracking(-1)
                 Text("Оригинальные файлы. Твоя библиотека.\nБез интернета, когда музыка уже на iPhone.")
                     .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button { importer = true } label: {
-                    Label(library.importing ? "Импортируем…" : "Добавить музыку", systemImage: library.importing ? "arrow.down" : "plus")
+                Button { devicePresented = true } label: {
+                    Label(pc.address.isEmpty ? "Подключить компьютер" : "Библиотека компьютера", systemImage:"desktopcomputer")
                         .font(.subheadline.weight(.semibold)).frame(minHeight: 44).padding(.horizontal, 12)
                 }
                 .buttonStyle(.glassProminent).disabled(library.importing || pc.downloading != nil)
@@ -146,8 +146,8 @@ struct RootView: View {
             if library.songs.isEmpty {
                 emptyLibrary
             } else {
-                sectionHeading("Недавно добавлено", detail: "На устройстве")
-                songList(library.recentSongs)
+                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "Недавно слушали", detail: "На устройстве")
+                songList(personal.state.recents.isEmpty ? library.recentSongs : Array(personal.state.recents.compactMap { id in library.songs.first(where:{$0.id == id}) }.prefix(8)))
                 sectionHeading("Альбомы", detail: "\(library.albums.count)")
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 18) {
