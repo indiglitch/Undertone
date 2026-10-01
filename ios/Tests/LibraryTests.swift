@@ -72,4 +72,24 @@ final class LibraryTests: XCTestCase {
         catch { XCTAssertTrue(error is LibraryError) }
         XCTAssertEqual(try Data(contentsOf: file), data)
     }
+    func testPCDownloadVerifiesOriginalAndPersistsSyncIdentity() async throws {
+        let directory = try root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let original = wav()
+        let file = directory.appendingPathComponent("download.tmp")
+        try original.write(to: file)
+        let hash = try LibraryRepository.sha256(file)
+        let track = PCTrack(sync_id: String(repeating: "a", count: 32), title: "PC song", artist: "Artist", album: "Album", duration: 0.1, format: "WAV", size: Int64(original.count))
+        let repository = LibraryRepository(root: directory.appendingPathComponent("storage"))
+        do { try await repository.installDownload(file, track: track, expectedHash: String(repeating: "0", count: 64)); XCTFail("Bad digest accepted") } catch { XCTAssertTrue(error is PCError) }
+        try await repository.installDownload(file, track: track, expectedHash: hash)
+        let songs = try await repository.read()
+        XCTAssertEqual(songs.first?.syncID, track.id)
+        let saved = try await repository.fileURL(XCTUnwrap(songs.first))
+        XCTAssertEqual(try Data(contentsOf: saved), original)
+    }
+    func testPairingRejectsPublicHostsAndInvalidSecrets() throws {
+        XCTAssertThrowsError(try PCPairing(version: 1, address: "https://example.com:443", token: String(repeating: "a", count: 64), fingerprint: String(repeating: "b", count: 64)).validate())
+        XCTAssertNoThrow(try PCPairing(version: 1, address: "https://192.168.1.4:3210", token: String(repeating: "a", count: 64), fingerprint: String(repeating: "b", count: 64)).validate())
+    }
 }

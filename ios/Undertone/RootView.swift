@@ -51,6 +51,7 @@ enum MobileTab: String, CaseIterable {
 struct RootView: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: MusicPlayer
+    @EnvironmentObject private var pc: PCConnection
     @State private var tab: MobileTab = .home
     @State private var importer = false
     @State private var expandedPlayer = false
@@ -66,7 +67,7 @@ struct RootView: View {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 28) {
                                 if item == .home { home }
-                                else if item == .device { devices }
+                                else if item == .device { PCDeviceView() }
                                 else { collection(downloads: item == .downloads) }
                             }
                             .padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 28)
@@ -97,11 +98,11 @@ struct RootView: View {
         }
         .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player) }
         .alert("Не удалось завершить действие", isPresented: Binding(
-            get: { library.error != nil || player.error != nil },
-            set: { if !$0 { library.error = nil; player.error = nil } }
+            get: { library.error != nil || player.error != nil || pc.error != nil },
+            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil } }
         )) {
-            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil }
-        } message: { Text(library.error ?? player.error ?? "") }
+            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil }
+        } message: { Text(library.error ?? player.error ?? pc.error ?? "") }
     }
 
     private var home: some View {
@@ -151,7 +152,7 @@ struct RootView: View {
                     Image(systemName: "desktopcomputer").font(.title2).foregroundStyle(Color.undertone)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Библиотека с компьютера").font(.subheadline.weight(.semibold))
-                        Text("Следующий этап — подключение к ПК").font(.caption).foregroundStyle(.secondary)
+                        Text(pc.address.isEmpty ? "Подключить по Wi-Fi" : "\(pc.tracks.count) треков на ПК").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
@@ -191,6 +192,31 @@ struct RootView: View {
             if library.songs.isEmpty { emptyLibrary }
             else if songs.isEmpty { ContentUnavailableView.search(text: query) }
             else { songList(songs) }
+            if !downloads && !pc.tracks.isEmpty {
+                sectionHeading("На компьютере", detail: "\(pc.tracks.count)")
+                if let title = pc.downloading { ProgressView("Скачиваем: \(title)") }
+                LazyVStack(spacing: 16) {
+                    ForEach(pc.tracks.filter { remote in !library.songs.contains(where: { $0.syncID == remote.id }) && (query.isEmpty || "\(remote.title) \(remote.artist) \(remote.album)".localizedCaseInsensitiveContains(query)) }) { track in
+                        HStack(spacing: 12) {
+                            Artwork(size: 52)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(track.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                Text(track.format.uppercased()).font(.caption2).foregroundStyle(Color.undertone)
+                            }
+                            Spacer()
+                            Button("Скачать \(track.title)", systemImage: "arrow.down.circle") { pc.download([track], library: library) }
+                                .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(pc.downloading != nil || library.importing)
+                        }
+                    }
+                }
+                let albums = Dictionary(grouping: pc.tracks, by: { "\($0.artist) — \($0.album)" })
+                sectionHeading("Скачать альбом", detail: "\(albums.count)")
+                ForEach(albums.keys.sorted(), id: \.self) { name in
+                    Button { pc.download(albums[name] ?? [], library: library) } label: { Label(name, systemImage: "arrow.down.circle").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8) }
+                        .disabled(pc.downloading != nil || library.importing)
+                }
+            }
         }
     }
 

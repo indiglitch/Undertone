@@ -54,6 +54,8 @@ jobs:
           set -euo pipefail
           mkdir -p ios/package/Payload
           cp -R ios/build/Build/Products/Release-iphoneos/Undertone.app ios/package/Payload/
+          codesign --force --sign - --generate-entitlement-der ios/package/Payload/Undertone.app
+          codesign --verify --strict ios/package/Payload/Undertone.app
           cd ios/package
           zip -q -r ../Undertone-SideStore.ipa Payload
       - uses: actions/upload-artifact@v4

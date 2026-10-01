@@ -114,10 +114,26 @@ actor LibraryRepository {
         if !FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.moveItem(at: temporary, to: destination)
         }
+        songs = try read()
         songs.removeAll { $0.id == hash }
         songs.append(song)
         try write(songs)
         return song
+    }
+
+    func installDownload(_ file: URL, track: PCTrack, expectedHash: String) throws {
+        try prepare()
+        let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard Int64(size) == track.size, try Self.sha256(file) == expectedHash.lowercased(),
+              !track.format.isEmpty, track.format.count <= 8, track.format.allSatisfy({ $0.isASCII && $0.isLetter || $0.isNumber }) else { throw PCError.corruptDownload }
+        let filename = "\(expectedHash.lowercased()).\(track.format.lowercased())"
+        let destination = root.appendingPathComponent("Music").appendingPathComponent(filename)
+        var songs = try read()
+        if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.moveItem(at: file, to: destination) }
+        let song = Song(id: expectedHash.lowercased(), syncID: track.id, filename: filename, title: track.title, artist: track.artist,
+                        album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date())
+        songs.removeAll { $0.id == song.id || $0.syncID == track.id }; songs.append(song)
+        try write(songs)
     }
 }
 
