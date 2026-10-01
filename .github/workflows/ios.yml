@@ -34,7 +34,8 @@ jobs:
           set -euo pipefail
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for k,v in d["devices"].items() if "iOS-26" in k for x in v if "iPhone" in x["name"]))')
           echo "IOS_SIMULATOR_ID=$DEVICE" >> "$GITHUB_ENV"
-          xcodebuild test -project ios/Undertone.xcodeproj -scheme Undertone -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath ios/test-build -resultBundlePath ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO
+          xcodebuild build-for-testing -project ios/Undertone.xcodeproj -scheme Undertone -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/test-build CODE_SIGNING_ALLOWED=NO
+          xcodebuild test-without-building -project ios/Undertone.xcodeproj -scheme Undertone -destination "platform=iOS Simulator,id=$DEVICE" -parallel-testing-enabled NO -derivedDataPath ios/test-build -resultBundlePath ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO
       - name: Capture native Liquid Glass screen
         shell: bash
         run: |

@@ -146,4 +146,16 @@ final class LibraryTests: XCTestCase {
         XCTAssertTrue(player.prepareToPlay()); XCTAssertEqual(player.duration, 0.5, accuracy: 0.03)
         XCTAssertEqual(try Data(contentsOf: file), original)
     }
+
+    func testDownloadQueueAndResumeCheckpointSurviveRelaunch() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let track = PCTrack(sync_id: String(repeating: "a", count: 32), title: "Original", artist: "Artist", album: "Album", duration: 12, format: "FLAC", size: 12000)
+        let store = DownloadPersistence(root: directory)
+        let queued = DownloadRecord(track: track, state: "paused", taskID: nil)
+        try await store.save([queued]); try await store.setResume(track.id, data: Data("checkpoint".utf8))
+        let reopened = DownloadPersistence(root: directory)
+        let queue = try await reopened.read(); let resume = await reopened.resume(track.id)
+        XCTAssertEqual(queue.first?.track, track); XCTAssertEqual(queue.first?.state, "paused")
+        XCTAssertEqual(resume, Data("checkpoint".utf8))
+    }
 }

@@ -10,7 +10,8 @@ struct DownloadRecord: Codable, Identifiable, Sendable {
 }
 
 actor DownloadPersistence {
-    let root = LibraryRepository.defaultRoot().appendingPathComponent("Transfers", isDirectory: true)
+    let root: URL
+    init(root: URL = LibraryRepository.defaultRoot().appendingPathComponent("Transfers", isDirectory: true)) { self.root = root }
     func read() throws -> [DownloadRecord] {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let file = root.appendingPathComponent("queue.json")

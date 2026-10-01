@@ -6,6 +6,15 @@ actor CoverStore {
     static let shared = CoverStore()
     private let root = LibraryRepository.defaultRoot().appendingPathComponent("Artwork", isDirectory: true)
     private let memory = NSCache<NSString, UIImage>()
+    private var activeFetches = 0
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    private func acquire() async {
+        if activeFetches < 3 { activeFetches += 1; return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+    private func release() {
+        if waiting.isEmpty { activeFetches -= 1 } else { waiting.removeFirst().resume() }
+    }
     private init() { memory.countLimit = 120; memory.totalCostLimit = 16 * 1024 * 1024 }
     private func path(_ id: String) -> URL { root.appendingPathComponent(id + ".jpg") }
     func contains(_ id: String) -> Bool { FileManager.default.fileExists(atPath: path(id).path) }
@@ -39,6 +48,8 @@ actor CoverStore {
     func fetchPC(_ track: PCTrack) async {
         guard track.has_cover == true, !contains(track.id), let pairing = PCKeychain.read(),
               let url = URL(string: pairing.address + "/v1/artwork/" + track.id) else { return }
+        await acquire(); defer { release() }
+        guard !Task.isCancelled else { return }
         let config = URLSessionConfiguration.ephemeral; config.timeoutIntervalForRequest = 10
         let session = URLSession(configuration: config, delegate: PinnedPCSession(pairing), delegateQueue: nil)
         defer { session.finishTasksAndInvalidate() }
