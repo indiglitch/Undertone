@@ -23,6 +23,10 @@ jobs:
           fi
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
+      - name: Start real PC networking fixture
+        run: |
+          cargo build --manifest-path phone-sync/Cargo.toml
+          python3 scripts/prepare-ios-network-test.py
       - name: Generate Xcode project
         run: |
           brew install xcodegen

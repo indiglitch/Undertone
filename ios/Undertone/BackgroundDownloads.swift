@@ -77,6 +77,7 @@ final class BackgroundDownloads: ObservableObject {
     private let repository = LibraryRepository(root: LibraryRepository.defaultRoot())
     private let delegate = DownloadDelegate()
     private var initialized = false
+    @Published private(set) var pausing = false
     private var starting = false
     private var transfers: [Int: URLSessionDownloadTask] = [:]
     private var pendingInstalls = 0
@@ -121,7 +122,7 @@ final class BackgroundDownloads: ObservableObject {
     }
     private func save() async { do { try await persistence.save(records) } catch { self.error = error.localizedDescription } }
     private func schedule() async {
-        guard !starting, let pairing = PCKeychain.read() else { return }
+        guard !starting, !pausing, let pairing = PCKeychain.read() else { return }
         starting = true; defer { starting = false }
         while transfers.count < 2, let record = records.first(where: { $0.state == "queued" }) {
             guard let url = URL(string: pairing.address + "/v1/file/" + record.id) else { return }
@@ -170,17 +171,19 @@ final class BackgroundDownloads: ObservableObject {
         await schedule()
     }
     func pause() async {
-        for index in records.indices where records[index].state == "queued" { records[index].state = "paused" }
-        for task in Array(transfers.values) {
-            if let index = records.firstIndex(where: { $0.taskID == task.taskIdentifier }) { records[index].state = "paused" }
-            task.cancel { [weak self] data in Task { @MainActor in
-                guard let self, let id = task.taskDescription else { return }
-                try? await self.persistence.setResume(id, data: data)
-            } }
+        guard !pausing else { return }; pausing = true; defer { pausing = false }
+        for index in records.indices where ["queued", "downloading"].contains(records[index].state) {
+            records[index].state = "paused"; records[index].taskID = nil
         }
-        await save()
+        let tasks = Array(transfers.values); transfers.removeAll(); await save()
+        for task in tasks {
+            let data: Data? = await withCheckedContinuation { continuation in task.cancel { continuation.resume(returning: $0) } }
+            guard let id = task.taskDescription, records.contains(where: { $0.id == id }) else { continue }
+            try? await persistence.setResume(id, data: data)
+        }
     }
     func resume() async {
+        guard !pausing else { return }
         for index in records.indices where ["paused", "failed"].contains(records[index].state) && records[index].taskID == nil { records[index].state = "queued" }
         await save(); await schedule()
     }

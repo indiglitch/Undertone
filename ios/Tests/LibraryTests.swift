@@ -158,4 +158,34 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(queue.first?.track, track); XCTAssertEqual(queue.first?.state, "paused")
         XCTAssertEqual(resume, Data("checkpoint".utf8))
     }
+
+    @MainActor func testBackgroundURLSessionTransfersPinnedOriginal() async throws {
+        guard let fixture = Bundle(for: LibraryTests.self).url(forResource: "network-pairing", withExtension: "json") else {
+            throw XCTSkip("Network fixture is prepared by GitHub Actions")
+        }
+        let pairing = try JSONDecoder().decode(PCPairing.self, from: Data(contentsOf: fixture)); try pairing.validate()
+        let session = URLSession(configuration: .ephemeral, delegate: PinnedPCSession(pairing), delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+        var request = URLRequest(url: URL(string: pairing.address + "/v1/library")!)
+        request.setValue("Bearer " + pairing.token, forHTTPHeaderField: "Authorization")
+        let (bytes, response) = try await session.data(for: request)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        let catalog = try PCStorage.decodeCatalog(bytes), track = try XCTUnwrap(catalog.tracks.first)
+        let repository = LibraryRepository(root: LibraryRepository.defaultRoot()), baseline = try await repository.read()
+        let downloads = BackgroundDownloads.shared
+        try PCKeychain.save(pairing)
+        await downloads.initialize(); await downloads.cancelAll()
+        await downloads.enqueue([track], installed: [])
+        var downloaded: Song?
+        for _ in 0..<300 {
+            if let song = try await repository.read().first(where: { $0.syncID == track.id }) { downloaded = song; break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        await downloads.cancelAll(); PCKeychain.remove()
+        guard let downloaded else { XCTFail("Background transfer failed: " + (downloads.error ?? "timeout")); return }
+        let file = try await repository.fileURL(downloaded)
+        XCTAssertEqual(downloaded.size, track.size)
+        XCTAssertEqual(try LibraryRepository.sha256(file), downloaded.id)
+        try FileManager.default.removeItem(at: file); try await repository.write(baseline)
+    }
 }

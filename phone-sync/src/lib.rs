@@ -108,12 +108,29 @@ impl Server {
         };
         let discovery = (|| -> Result<mdns_sd::ServiceDaemon, String> {
             let daemon = mdns_sd::ServiceDaemon::new().map_err(|e| e.to_string())?;
+            let interfaces = if_addrs::get_if_addrs()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .filter(|interface| interface.ip() == ip)
+                .map(|interface| mdns_sd::IfKind::Name(interface.name))
+                .collect::<Vec<_>>();
+            if interfaces.is_empty() {
+                return Err("LAN interface not found".into());
+            }
+            daemon
+                .disable_interface(mdns_sd::IfKind::All)
+                .map_err(|e| e.to_string())?;
+            for interface in &interfaces {
+                daemon
+                    .enable_interface(interface.clone())
+                    .map_err(|e| e.to_string())?;
+            }
             let label = format!("undertone-{}", &pairing.fingerprint[..16]);
             let properties = [
                 ("fingerprint", pairing.fingerprint.as_str()),
                 ("version", "1"),
             ];
-            let info = mdns_sd::ServiceInfo::new(
+            let mut info = mdns_sd::ServiceInfo::new(
                 "_undertone._tcp.local.",
                 &label,
                 &format!("{label}.local."),
@@ -123,6 +140,7 @@ impl Server {
             )
             .map_err(|e| e.to_string())?
             .enable_addr_auto();
+            info.set_interfaces(interfaces);
             daemon.register(info).map_err(|e| e.to_string())?;
             Ok(daemon)
         })()

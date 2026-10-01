@@ -5,3 +5,5 @@ package/
 *.xcresult/
 test-build/
 Undertone-iPhone.png
+
+Tests/Fixtures/network-pairing.json

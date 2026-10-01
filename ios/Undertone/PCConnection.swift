@@ -93,6 +93,7 @@ final class PCConnection: ObservableObject {
     @Published private(set) var refreshing = false
     @Published private(set) var online = false
     @Published private(set) var collections = PCCollections()
+    @Published private(set) var likedIDs: Set<String> = []
     @Published private(set) var pendingCount = 0
     @Published private(set) var collectionsRevision = 0
     @Published var error: String?
@@ -196,7 +197,7 @@ final class PCConnection: ObservableObject {
     private func publishCollections() {
         var visible = state.collections
         for edit in state.pending { visible.apply(edit) }
-        collections = visible; pendingCount = state.pending.count; collectionsRevision += 1
+        collections = visible; likedIDs = Set(visible.likes); pendingCount = state.pending.count; collectionsRevision += 1
     }
     func edit(_ edit: PCEdit) {
         state.pending.append(edit); publishCollections()

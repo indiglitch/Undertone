@@ -54,7 +54,7 @@ struct MusicLibraryView: View {
                 Section("На iPhone · \(songs.count)") {
                     ForEach(Array(songs.enumerated()), id: \.offset) { _, song in
                         Button { Task { await player.play(song, queue: songs, repository: library.repository) } } label: {
-                            SongRow(song: song, liked: song.syncID.map { pc.collections.likes.contains($0) } ?? false)
+                            SongRow(song: song, liked: song.syncID.map { pc.likedIDs.contains($0) } ?? false)
                         }.buttonStyle(.plain).contextMenu { if let id = song.syncID { trackMenu(id) } }
                     }
                 }
@@ -66,7 +66,7 @@ struct MusicLibraryView: View {
                             CoverArtwork(id: track.id, remote: track)
                             TrackLabels(title: track.title, artist: track.artist, format: track.format)
                             Spacer(minLength: 4)
-                            if pc.collections.likes.contains(track.id) { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Color.undertone) }
+                            if pc.likedIDs.contains(track.id) { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Color.undertone) }
                             Button("Скачать \(track.title)", systemImage: "arrow.down.circle") { pc.download([track], library: library) }
                                 .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(library.importing)
                         }.contextMenu { trackMenu(track.id) }
@@ -125,8 +125,8 @@ struct MusicLibraryView: View {
         }
     }
     @ViewBuilder private func trackMenu(_ id: String) -> some View {
-        Button(pc.collections.likes.contains(id) ? "Убрать из любимых" : "В любимые", systemImage: "heart") {
-            pc.edit(PCEdit(kind: "like", track: id, liked: !pc.collections.likes.contains(id)))
+        Button(pc.likedIDs.contains(id) ? "Убрать из любимых" : "В любимые", systemImage: "heart") {
+            pc.edit(PCEdit(kind: "like", track: id, liked: !pc.likedIDs.contains(id)))
         }
         Menu("В плейлист", systemImage: "text.badge.plus") {
             ForEach(pc.collections.playlists) { playlist in
@@ -171,7 +171,7 @@ struct DownloadStatus: View {
                 HStack {
                     Button(downloads.active ? "Приостановить" : "Продолжить") { Task { if downloads.active { await downloads.pause() } else { await downloads.resume() } } }
                     Button("Очистить очередь", role: .destructive) { Task { await downloads.cancelAll() } }
-                }.buttonStyle(.glass)
+                }.buttonStyle(.glass).disabled(downloads.pausing)
             }.padding(20).modifier(GlassSurface())
         }
     }

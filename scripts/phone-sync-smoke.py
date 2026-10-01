@@ -66,6 +66,11 @@ with tempfile.TemporaryDirectory(prefix='undertone-phone-test-') as temporary:
         assert json.loads(get('/v1/collections',pairing['token'])[2])==snapshot, 'Conflicting batch must roll back'
         connection=sqlite3.connect(db);connection.execute('UPDATE playlists SET name="Renamed on PC"');connection.commit();connection.close()
         assert json.loads(get('/v1/collections',pairing['token'])[2])['playlists'][0]['name']=='Renamed on PC'
+        result=subprocess.run([str(exe),'--discover',pairing['fingerprint']],capture_output=True,text=True,timeout=15)
+        assert result.returncode==0, result.stderr
+        discovered=json.loads(result.stdout)
+        assert discovered['port']==address.port and address.hostname in discovered['addresses'], (discovered, address.hostname, address.port)
+        assert discovered['host'].startswith('undertone-'+pairing['fingerprint'][:16])
         protected = (root / 'phone-sync-identity.bin').read_bytes()
         assert pairing['token'].encode() not in protected
         for _ in range(2):
