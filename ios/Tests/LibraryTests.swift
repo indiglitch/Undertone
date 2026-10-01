@@ -168,14 +168,19 @@ final class LibraryTests: XCTestCase {
         defer { session.invalidateAndCancel() }
         var request = URLRequest(url: URL(string: pairing.address + "/v1/library")!)
         request.setValue("Bearer " + pairing.token, forHTTPHeaderField: "Authorization")
+        print("Network test: requesting pinned catalog")
         let (bytes, response) = try await session.data(for: request)
+        print("Network test: catalog received")
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
         let catalog = try PCStorage.decodeCatalog(bytes), track = try XCTUnwrap(catalog.tracks.first)
         let repository = LibraryRepository(root: LibraryRepository.defaultRoot()), baseline = try await repository.read()
         let downloads = BackgroundDownloads.shared
         try PCKeychain.save(pairing)
+        print("Network test: initializing background queue")
         await downloads.initialize(); await downloads.cancelAll()
+        print("Network test: queue initialized")
         await downloads.enqueue([track], installed: [])
+        print("Network test: download enqueued")
         var downloaded: Song?
         for _ in 0..<300 {
             if let song = try await repository.read().first(where: { $0.syncID == track.id }) { downloaded = song; break }
