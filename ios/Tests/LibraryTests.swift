@@ -54,4 +54,22 @@ final class LibraryTests: XCTestCase {
         do { _ = try await repository.fileURL(song); XCTFail("Expected traversal rejection") }
         catch { XCTAssertTrue(error is LibraryError) }
     }
+    func testHashMatchesKnownSHA256() throws {
+        let directory = try root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("hash.bin")
+        try Data("abc".utf8).write(to: file)
+        XCTAssertEqual(try LibraryRepository.sha256(file), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+    }
+    func testFutureManifestVersionIsRejectedWithoutDataLoss() async throws {
+        let directory = try root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let data = Data("{\"version\":2,\"songs\":[]}".utf8)
+        let file = directory.appendingPathComponent("library.json")
+        try data.write(to: file)
+        let repository = LibraryRepository(root: directory)
+        do { _ = try await repository.read(); XCTFail("Expected future version rejection") }
+        catch { XCTAssertTrue(error is LibraryError) }
+        XCTAssertEqual(try Data(contentsOf: file), data)
+    }
 }

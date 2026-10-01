@@ -3,3 +3,5 @@ package/
 *.ipa
 *.xcodeproj/
 *.xcresult/
+test-build/
+Undertone-iPhone.png

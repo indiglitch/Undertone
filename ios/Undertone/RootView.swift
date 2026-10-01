@@ -107,8 +107,8 @@ struct RootView: View {
     private var home: some View {
         VStack(alignment: .leading, spacing: 28) {
             VStack(alignment: .leading, spacing: 16) {
-                HStack { Label("UNDERTONE", systemImage: "waveform").font(.caption.weight(.semibold)).tracking(2); Spacer(); Image(systemName: "sparkle").foregroundStyle(.undertone) }
-                Text("Твоя музыка.\nВсегда рядом.").font(.system(size: 34, weight: .bold, design: .rounded)).tracking(-1)
+                HStack { Label("UNDERTONE", systemImage: "waveform").font(.caption.weight(.semibold)).tracking(2); Spacer(); Image(systemName: "sparkle").foregroundStyle(Color.undertone) }
+                Text("Твоя музыка.\nВсегда рядом.").font(.system(.largeTitle, design: .rounded).bold()).tracking(-1)
                 Text("Оригинальные файлы. Твоя библиотека.\nБез интернета, когда музыка уже на iPhone.")
                     .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button { importer = true } label: {
@@ -148,7 +148,7 @@ struct RootView: View {
             }
             Button { tab = .device } label: {
                 HStack(spacing: 14) {
-                    Image(systemName: "desktopcomputer").font(.title2).foregroundStyle(.undertone)
+                    Image(systemName: "desktopcomputer").font(.title2).foregroundStyle(Color.undertone)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Библиотека с компьютера").font(.subheadline.weight(.semibold))
                         Text("Следующий этап — подключение к ПК").font(.caption).foregroundStyle(.secondary)
@@ -172,7 +172,7 @@ struct RootView: View {
         VStack(alignment: .leading, spacing: 22) {
             if downloads {
                 HStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.undertone)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.undertone)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Доступно без интернета").font(.headline)
                         Text("\(library.songs.count) файлов · \(ByteCountFormatter.string(fromByteCount: library.bytes, countStyle: .file))").font(.caption).foregroundStyle(.secondary)
@@ -197,8 +197,8 @@ struct RootView: View {
     private var devices: some View {
         VStack(alignment: .leading, spacing: 24) {
             ZStack {
-                Circle().fill(.undertone.opacity(0.12)).frame(width: 132, height: 132)
-                Image(systemName: "desktopcomputer.and.arrow.down").font(.system(size: 52)).foregroundStyle(.undertone)
+                Circle().fill(Color.undertone.opacity(0.12)).frame(width: 132, height: 132)
+                Image(systemName: "desktopcomputer.and.arrow.down").font(.system(size: 52)).foregroundStyle(Color.undertone)
             }.frame(maxWidth: .infinity).padding(.vertical, 20)
             Text("Музыка с твоего ПК").font(.largeTitle.bold())
             Text("Здесь появится подключение к Undertone на компьютере: каталог, плейлисты и загрузка оригинальных файлов по Wi-Fi.")
@@ -216,7 +216,7 @@ struct RootView: View {
 
     private func stat(_ title: String, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: icon).foregroundStyle(.undertone)
+            Image(systemName: icon).foregroundStyle(Color.undertone)
             Text(value).font(.title2.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
             Text(title).font(.caption).foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
@@ -237,7 +237,7 @@ struct RootView: View {
                         }
                         Spacer(minLength: 4)
                         VStack(alignment: .trailing, spacing: 5) {
-                            Text(song.format).font(.system(size: 10, weight: .semibold)).foregroundStyle(.undertone)
+                            Text(song.format).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.undertone)
                             Image(systemName: player.current?.id == song.id && player.playing ? "waveform" : "checkmark.circle.fill")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -287,7 +287,7 @@ struct PlayerView: View {
                         VStack(spacing: 8) {
                             Text(player.current?.title ?? "Нет выбранного трека").font(.title2.bold()).multilineTextAlignment(.center)
                             Text(player.current?.artist ?? "").foregroundStyle(.secondary)
-                            Text("\(player.current?.format ?? "") · Оригинальный файл").font(.caption).foregroundStyle(.undertone)
+                            Text("\(player.current?.format ?? "") · Оригинальный файл").font(.caption).foregroundStyle(Color.undertone)
                         }
                         VStack(spacing: 6) {
                             Slider(value: Binding(get: { seeking ? seekPosition : player.position }, set: { seekPosition = $0 }), in: 0...max(1, player.duration)) { editing in

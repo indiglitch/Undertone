@@ -81,6 +81,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             playing = true
             updateNowPlaying()
         } catch {
+            guard generation == playGeneration else { return }
             audio = nil
             current = nil
             position = 0
@@ -127,7 +128,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, self.audio === player else { return }
             self.playing = false
             if flag { await self.advance(1) } else { self.updateNowPlaying() }
         }
