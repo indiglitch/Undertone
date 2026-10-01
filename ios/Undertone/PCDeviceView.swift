@@ -17,6 +17,7 @@ struct PCDeviceView: View {
                 Label("\(pc.tracks.count) треков в каталоге", systemImage: "music.note.list")
                 Button(pc.refreshing ? "Обновляем…" : "Обновить библиотеку", systemImage: "arrow.clockwise") { Task { await pc.refresh() } }.buttonStyle(.glass).disabled(pc.refreshing)
                 Button("Скачать всю библиотеку", systemImage: "arrow.down.circle") { pc.download(pc.tracks, library: library) }.buttonStyle(.glassProminent).disabled(pc.tracks.isEmpty || pc.downloading != nil || library.importing)
+                NavigationLink { PendingEditsView() } label: { Label("Синхронизация · \(pc.pendingCount)", systemImage: "arrow.triangle.2.circlepath") }
                 DownloadStatus()
                 Button("Отключить компьютер", role: .destructive) { pc.disconnect() }
             }

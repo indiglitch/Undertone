@@ -188,4 +188,18 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(try LibraryRepository.sha256(file), downloaded.id)
         try FileManager.default.removeItem(at: file); try await repository.write(baseline)
     }
+
+    func testIdenticalPCFilesRetainBothPlaylistIdentities() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = LibraryRepository(root: directory.appendingPathComponent("store")), bytes = wav()
+        let first = directory.appendingPathComponent("first.tmp"), second = directory.appendingPathComponent("second.tmp")
+        try bytes.write(to: first); try bytes.write(to: second)
+        let hash = try LibraryRepository.sha256(first)
+        let a = PCTrack(sync_id: String(repeating: "a", count: 32), title: "Same audio", artist: "Artist", album: "Album", duration: 0.1, format: "WAV", size: Int64(bytes.count))
+        let b = PCTrack(sync_id: String(repeating: "b", count: 32), title: "Same audio", artist: "Artist", album: "Album", duration: 0.1, format: "WAV", size: Int64(bytes.count))
+        try await repository.installDownload(first, track: a, expectedHash: hash)
+        try await repository.installDownload(second, track: b, expectedHash: hash)
+        let songs = try await repository.read()
+        XCTAssertEqual(songs.count, 1); XCTAssertEqual(songs.first?.sourceIDs, Set([a.id, b.id]))
+    }
 }

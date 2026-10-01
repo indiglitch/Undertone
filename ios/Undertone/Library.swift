@@ -14,6 +14,8 @@ struct Song: Codable, Identifiable, Equatable, Sendable {
     let size: Int64
     let format: String
     let addedAt: Date
+    var syncIDs: [String]? = nil
+    var sourceIDs: Set<String> { Set(syncIDs ?? []).union(syncID.map { [$0] } ?? []) }
 }
 
 struct LibraryManifest: Codable {
@@ -131,10 +133,11 @@ actor LibraryRepository {
         let destination = root.appendingPathComponent("Music").appendingPathComponent(filename)
         var songs = try read()
         if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.moveItem(at: file, to: destination) }
-        let song = Song(id: expectedHash.lowercased(), syncID: track.id, filename: filename, title: track.title, artist: track.artist,
-                        album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date())
         await CoverStore.shared.extract(destination, id: track.id)
         songs = try read()
+        let aliases = (songs.first(where: { $0.id == expectedHash.lowercased() })?.sourceIDs ?? []).union([track.id])
+        let song = Song(id: expectedHash.lowercased(), syncID: track.id, filename: filename, title: track.title, artist: track.artist,
+                        album: track.album, duration: track.duration.isFinite ? max(0, track.duration) : 0, size: track.size, format: track.format.uppercased(), addedAt: Date(), syncIDs: aliases.sorted())
         songs.removeAll { $0.id == song.id || $0.syncID == track.id }; songs.append(song)
         try write(songs)
     }
@@ -154,15 +157,18 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var installedIDs: Set<String> = []
     @Published private(set) var revision = 0
 
+    private var loadGeneration = 0
     func load() async {
+        loadGeneration += 1; let operation = loadGeneration
         do {
             let records = try await repository.read()
             guard records != songs else { return }
             let index = await Task.detached(priority: .userInitiated) {
                 (records.reduce(Int64(0)) { $0 + $1.size }, Dictionary(grouping: records, by: { "\($0.artist) — \($0.album)" }),
                  records.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending },
-                 Array(records.sorted { $0.addedAt > $1.addedAt }.prefix(8)), Set(records.compactMap(\.syncID)))
+                 Array(records.sorted { $0.addedAt > $1.addedAt }.prefix(8)), Set(records.flatMap { $0.sourceIDs }))
             }.value
+            guard operation == loadGeneration else { return }
             bytes = index.0; albums = index.1; sortedSongs = index.2; recentSongs = index.3; installedIDs = index.4
             songs = records; revision += 1
         }

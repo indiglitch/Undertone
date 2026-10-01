@@ -97,6 +97,7 @@ final class PCConnection: ObservableObject {
     @Published private(set) var pendingCount = 0
     @Published private(set) var collectionsRevision = 0
     @Published var error: String?
+    var pendingEdits: [PCEdit] { state.pending }
     private var pairing: PCPairing?
     private var session: URLSession?
     private var generation = 0
@@ -206,6 +207,11 @@ final class PCConnection: ObservableObject {
             catch { self.error = error.localizedDescription }
         }
     }
+    func discardEdit(_ id: String) {
+        guard !syncing else { return }
+        state.pending.removeAll { $0.id == id }; publishCollections()
+        Task { do { try await storage.save(state); await syncCollections() } catch { self.error = error.localizedDescription } }
+    }
     func syncCollections(quiet: Bool = false) async {
         guard !syncing, let session else { return }; syncing = true; defer { syncing = false }
         let operation = generation
@@ -231,7 +237,14 @@ final class PCConnection: ObservableObject {
                 let acknowledged = Set(sending.map(\.id)); state.pending.removeAll { acknowledged.contains($0.id) }
                 state.collections = snapshot; publishCollections(); try await storage.save(state)
             } while !state.pending.isEmpty
-        } catch { if !quiet || (error as NSError).domain == "UndertoneSync" { self.error = error.localizedDescription } }
+        } catch {
+            if (error as NSError).domain == "UndertoneSync", generation == operation {
+                if let data = try? await data("/v1/collections"), let snapshot = try? JSONDecoder().decode(PCCollections.self, from: data) {
+                    state.collections = snapshot; publishCollections(); try? await storage.save(state)
+                }
+                self.error = "Некоторые изменения конфликтуют с библиотекой ПК. Открой «Синхронизация», чтобы отменить изменения удалённых треков или плейлистов."
+            } else if !quiet { self.error = error.localizedDescription }
+        }
     }
     func disconnect() {
         generation += 1; deactivate(); session?.invalidateAndCancel(); session = nil
@@ -241,7 +254,7 @@ final class PCConnection: ObservableObject {
     }
     func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {
-        let installed = Set(library.songs.compactMap(\.syncID))
+        let installed = library.installedIDs
         Task { await BackgroundDownloads.shared.enqueue(selected, installed: installed) }
     }
 }

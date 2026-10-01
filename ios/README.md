@@ -2,18 +2,19 @@
 
 Native SwiftUI client, deployment target iOS 26+. Uses the system Liquid Glass APIs rather than a web/CSS imitation. The requested iOS 27.0.1 device must be tested separately; no device compatibility result is implied by the deployment target.
 
-## Implemented first milestone
+## Version 0.3
 
-- Home, searchable local library, on-device storage view, honest PC-connection placeholder.
-- System glass tab bar, toolbar, mini-player, glass player controls; Reduce Transparency fallback for custom glass surfaces.
-- Multiple-file import through Apple's Files picker, byte-for-byte copies in Application Support, streaming SHA-256 identities, duplicate suppression.
-- Atomic versioned JSON manifest, reopens without reimport. This is the local MVP store; PC sync will use a separately versioned contract and preserve desktop `sync_id`.
-- AVAudioPlayer, local queue, seeking, background-audio declaration, lock-screen metadata/remote commands, pause on interruptions or headphone disconnect.
-- XcodeGen project and GitHub Actions workflow: simulator persistence tests → unsigned device build → `Payload/Undertone.app` IPA → artifact.
+- QR pairing over pinned HTTPS; Keychain on iPhone and DPAPI-protected identity on Windows. Access stays enabled across restarts.
+- Automatic rediscovery of the already paired PC using Bonjour. The service advertises its public certificate fingerprint, never its bearer token. Windows advertises only the chosen LAN interface.
+- Cached catalog, native searchable List, songs/albums/all-library/playlist downloads of original bytes with SHA-256 and byte-size verification.
+- Persistent background URLSession queue, two concurrent transfers, pause/resume checkpoints and HTTP Range/ETag. iOS schedules background execution; force-quitting the app cancels system transfers until the app is reopened. PC must remain running and reachable on the same Wi-Fi.
+- Bidirectional favorite and playlist edits. Offline operations are persisted and sent idempotently when the PC returns. Conflicting edits remain available in the Synchronization screen, where the user can cancel them.
+- Embedded/imported artwork plus authenticated PC artwork, bounded thumbnail disk/memory caches and at most three cover requests.
+- AVAudioPlayer for native formats (including verified FLAC), plus a bounded streaming Ogg Vorbis decoder. Original files are preserved; Ogg Opus and other unsupported variants produce an error rather than silent transcoding.
+- Playback queue, seeking, lock-screen metadata/artwork/commands, background audio, headphone disconnect and interruption handling.
+- Atomic library manifest remains backward compatible with 0.1/0.2. Identical bytes can retain multiple desktop identities without duplicate storage.
 
-Version 0.2 adds PC pairing by QR (or pasted pairing JSON), certificate-pinned HTTPS, Keychain credentials, cached PC catalog, individual/album/all-library downloads and SHA-256/size verification. Enable access in desktop Settings → Music on iPhone. Both devices must share a private IPv4 LAN. The server is off by default; its certificate, token and port persist across restarts, and previously enabled access starts automatically. Disabling access pauses the service without forgetting paired phones. A changed PC LAN address still requires a new QR scan. Downloaded originals are independent of PC availability.
-
-Downloads currently require the iPhone app to remain in the foreground; interrupted downloads can be retried, but byte-range resume and persistent background URLSession jobs are not implemented yet. Two-way playlists/likes, embedded cover artwork, and non-native decoding remain follow-up work. The waveform artwork is the Undertone fallback, not extracted cover art.
+Performance changes isolate the playback clock from the full library view, move catalog decode/search/sort/grouping off the UI thread, debounce search, reuse native rows and decode thumbnail images off the main thread. Actual scroll smoothness must be verified on the user iPhone.
 
 ## Build
 
@@ -37,11 +38,11 @@ The GitHub workflow runs on pushes to `codex/ios-companion`, or by manual dispat
 
 Actual refresh/update preservation needs a device test with SideStore; it is not guaranteed merely by keeping a bundle identifier.
 
-## Remaining sync work
+## Current limits
 
-- Persistent background downloads and byte-range resume.
-- Catalog revisions, deletion tombstones and two-way likes/playlists.
-- Embedded artwork and additional audio decoders.
+- PC connectivity still requires the same LAN; access over the internet is not implemented.
+- Background transfer scheduling, app-update/signing preservation and real-device playback interruptions require iPhone acceptance testing.
+- Ogg Opus and arbitrary exotic codecs are not covered by the Vorbis decoder.
 
 ## Acceptance on the real iPhone
 

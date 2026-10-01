@@ -36,7 +36,7 @@ struct MusicLibraryView: View {
                     }
                     Button("Создать плейлист", systemImage: "plus") { name = ""; newPlaylist = true }
                         .disabled(pc.address.isEmpty)
-                    if pc.pendingCount > 0 { Text("\(pc.pendingCount) изменений ждут синхронизации с ПК").font(.caption).foregroundStyle(.secondary) }
+                    if pc.pendingCount > 0 { NavigationLink { PendingEditsView() } label: { Label("Синхронизация · \(pc.pendingCount)", systemImage: "arrow.triangle.2.circlepath") } }
                 }
             }
             if let playlistID, let playlist {
@@ -101,12 +101,12 @@ struct MusicLibraryView: View {
                     (album == nil || album == "\(artist) — \(albumName)") && (query.isEmpty || "\(title) \(artist) \(albumName)".localizedCaseInsensitiveContains(query))
                 }
                 if let playlistTracks {
-                    let localMap = Dictionary(local.compactMap { song in song.syncID.map { ($0, song) } }, uniquingKeysWith: { first, _ in first })
+                    let localMap = Dictionary(local.flatMap { song in song.sourceIDs.map { id in var copy = song; copy.syncID = id; return (id, copy) } }, uniquingKeysWith: { first, _ in first })
                     let pcMap = Dictionary(tracks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
                     return (playlistTracks.compactMap { localMap[$0] }.filter { matches($0.title, $0.artist, $0.album) },
                         playlistTracks.filter { !installed.contains($0) }.compactMap { pcMap[$0] }.filter { matches($0.title, $0.artist, $0.album) })
                 }
-                return (local.filter { (!favorites || $0.syncID.map { likes.contains($0) } == true) && matches($0.title, $0.artist, $0.album) },
+                return (local.filter { (!favorites || !$0.sourceIDs.isDisjoint(with: likes)) && matches($0.title, $0.artist, $0.album) },
                     tracks.filter { !installed.contains($0.id) && (!favorites || likes.contains($0.id)) && matches($0.title, $0.artist, $0.album) })
             }.value
             guard !Task.isCancelled else { return }; songs = result.0; remote = result.1
