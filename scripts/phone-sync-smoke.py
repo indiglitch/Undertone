@@ -47,6 +47,21 @@ with tempfile.TemporaryDirectory(prefix='undertone-phone-test-') as temporary:
         assert headers['X-Content-SHA256'] == hashlib.sha256(original).hexdigest()
         assert get('/v1/file/../../outside', pairing['token'])[0] == 404
         assert get('/v1/file/' + 'f' * 32, pairing['token'])[0] == 404
-        print('PASS: TLS fingerprint, auth rejection, catalog, original bytes/hash, traversal and missing identity')
+        protected = (root / 'phone-sync-identity.bin').read_bytes()
+        assert pairing['token'].encode() not in protected
+        for _ in range(2):
+            process.terminate(); process.wait(timeout=10)
+            status_file.unlink()
+            process = subprocess.Popen([str(exe), str(db), str(status_file)], stdout=subprocess.DEVNULL)
+            for attempt in range(100):
+                if status_file.exists(): break
+                if process.poll() is not None: raise RuntimeError('Restart failed')
+                time.sleep(0.1)
+            restored = json.loads(json.loads(status_file.read_text())['code'])
+            assert restored == pairing, 'Address, token and certificate must survive restart'
+            assert get('/v1/library', pairing['token'])[0] == 200
+            status, headers, body = get('/v1/file/' + identity, pairing['token'])
+            assert status == 200 and body == original
+        print('PASS: TLS, auth, original bytes, encrypted identity, two restarts with original pairing')
     finally:
         process.terminate(); process.wait(timeout=10)

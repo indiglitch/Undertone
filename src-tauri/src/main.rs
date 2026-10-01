@@ -18,10 +18,11 @@ fn phone_sync_status(server: State<'_, PhoneServer>) -> Option<undertone_phone_s
 async fn phone_sync_start(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<undertone_phone_sync::Status,String> {
     let mut running = server.0.lock().map_err(|_|"Phone server unavailable")?;
     if running.is_none() { *running=Some(undertone_phone_sync::Server::start(db.path.clone())?); }
+    undertone_phone_sync::Server::set_enabled(&db.path, true)?;
     Ok(running.as_ref().unwrap().status())
 }
 #[tauri::command]
-fn phone_sync_stop(server: State<'_, PhoneServer>) { *server.0.lock().unwrap()=None; }
+fn phone_sync_stop(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<(),String> { undertone_phone_sync::Server::set_enabled(&db.path, false)?; *server.0.lock().unwrap()=None; Ok(()) }
 
 
 
@@ -578,8 +579,11 @@ fn main() {
                 &std::env::current_exe()?,
             ).map_err(std::io::Error::other)?;
             let db = Database::open(&data_dir).map_err(std::io::Error::other)?;
+            let phone = if undertone_phone_sync::Server::enabled(&db.path) {
+                match undertone_phone_sync::Server::start(db.path.clone()) { Ok(server)=>Some(server), Err(error)=>{eprintln!("Phone access could not restart: {error}");None} }
+            } else {None};
             app.manage(db);
-            app.manage(PhoneServer::default());
+            app.manage(PhoneServer(Mutex::new(phone)));
             app.manage(undertone::bulk_lyrics::BulkLyricsJob::default());
             #[cfg(all(
                 feature = "external-lyrics",

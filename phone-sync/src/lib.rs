@@ -2,6 +2,7 @@ use std::{fs::File, io::{Read, Write, Seek, SeekFrom}, net::{TcpListener, TcpStr
 use rand::RngCore;
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
+mod identity;
 use sha2::{Digest, Sha256};
 
 #[derive(Clone, Serialize)]
@@ -16,19 +17,33 @@ pub struct Status { pub running: bool, pub address: String, pub code: String, pu
 pub struct Server { stop: Arc<AtomicBool>, status: Status }
 impl Drop for Server { fn drop(&mut self) { self.stop.store(true, Ordering::Relaxed); } }
 impl Server {
+    pub fn enabled(database: &PathBuf) -> bool { database.with_file_name("phone-sync-enabled").exists() }
+    pub fn set_enabled(database: &PathBuf, enabled: bool) -> Result<(),String> {
+        let path = database.with_file_name("phone-sync-enabled");
+        if enabled { std::fs::write(path,b"1").map_err(|e|e.to_string()) } else { match std::fs::remove_file(path) { Ok(())=>Ok(()), Err(e) if e.kind()==std::io::ErrorKind::NotFound=>Ok(()), Err(e)=>Err(e.to_string()) } }
+    }
     pub fn status(&self) -> Status { self.status.clone() }
     pub fn start(database: PathBuf) -> Result<Self, String> {
-        let listener = TcpListener::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
+        let saved = identity::load(&database)?;
+        let listener = TcpListener::bind(("0.0.0.0", saved.as_ref().map(|s|s.port).unwrap_or(0))).map_err(|e| format!("Не удалось открыть сохранённый порт подключения: {e}"))?;
         let socket = UdpSocket::bind("0.0.0.0:0").map_err(|e| e.to_string())?;
         socket.connect("192.0.2.1:80").map_err(|e| e.to_string())?;
         let ip = socket.local_addr().map_err(|e| e.to_string())?.ip();
-        let certificate = rcgen::generate_simple_self_signed(vec![ip.to_string()]).map_err(|e| e.to_string())?;
-        let fingerprint = hex(&Sha256::digest(certificate.cert.der()));
-        let key = rustls::pki_types::PrivatePkcs8KeyDer::from(certificate.signing_key.serialize_der());
+        let saved = match saved {
+            Some(saved) => saved,
+            None => {
+                let certificate = rcgen::generate_simple_self_signed(vec![ip.to_string()]).map_err(|e| e.to_string())?;
+                let mut secret = [0u8;32]; rand::rng().fill_bytes(&mut secret);
+                let saved = identity::Identity { port: listener.local_addr().map_err(|e|e.to_string())?.port(), token: hex(&secret), certificate: certificate.cert.der().to_vec(), key: certificate.signing_key.serialize_der() };
+                identity::save(&database, &saved)?;
+                saved
+            }
+        };
+        let fingerprint = hex(&Sha256::digest(&saved.certificate));
+        let key = rustls::pki_types::PrivatePkcs8KeyDer::from(saved.key);
         let config = rustls::ServerConfig::builder().with_no_client_auth()
-            .with_single_cert(vec![certificate.cert.der().clone()], key.into()).map_err(|e| e.to_string())?;
-        let mut secret = [0u8; 32]; rand::rng().fill_bytes(&mut secret);
-        let pairing = Pairing { version: 1, address: format!("https://{}:{}", ip, listener.local_addr().unwrap().port()), token: hex(&secret), fingerprint };
+            .with_single_cert(vec![rustls::pki_types::CertificateDer::from(saved.certificate)], key.into()).map_err(|e| e.to_string())?;
+        let pairing = Pairing { version: 1, address: format!("https://{}:{}", ip, saved.port), token: saved.token, fingerprint };
         let code = serde_json::to_string(&pairing).map_err(|e| e.to_string())?;
         let qr = qrcode::QrCode::new(code.as_bytes()).map_err(|e| e.to_string())?;
         let qr_svg = qr.render::<qrcode::render::svg::Color>().min_dimensions(280, 280).build();
@@ -116,5 +131,12 @@ fn serve(socket: TcpStream, config: Arc<rustls::ServerConfig>, db_path: PathBuf,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn access_preference_survives_restart() {
+        let root=std::env::temp_dir().join(format!("undertone-access-{}",rand::random::<u64>()));
+        std::fs::create_dir(&root).unwrap(); let db=root.join("library.sqlite3");
+        assert!(!Server::enabled(&db)); Server::set_enabled(&db,true).unwrap();
+        assert!(Server::enabled(&db)); Server::set_enabled(&db,false).unwrap();
+        assert!(!Server::enabled(&db)); Server::set_enabled(&db,false).unwrap(); std::fs::remove_dir(root).unwrap();
+    }
     #[test] fn bearer_token_is_required_exactly() {assert!(authorized("GET / HTTP/1.1\r\nAuthorization: Bearer abc\r\n","abc")); assert!(!authorized("Authorization: Bearer abcd","abc"));assert!(!authorized("","abc"));}
 }
