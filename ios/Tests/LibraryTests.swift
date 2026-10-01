@@ -159,7 +159,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(resume, Data("checkpoint".utf8))
     }
 
-    @MainActor func testBackgroundURLSessionTransfersPinnedOriginal() async throws {
+    @MainActor func testDownloadQueueTransfersPinnedOriginal() async throws {
         guard let fixture = Bundle(for: LibraryTests.self).url(forResource: "network-pairing", withExtension: "json") else {
             throw XCTSkip("Network fixture is prepared by GitHub Actions")
         }
@@ -175,7 +175,7 @@ final class LibraryTests: XCTestCase {
         let catalog = try PCStorage.decodeCatalog(bytes), track = try XCTUnwrap(catalog.tracks.first)
         let directory = try root(); defer { try? FileManager.default.removeItem(at: directory) }
         let repository = LibraryRepository(root: directory)
-        let downloads = BackgroundDownloads(root: directory, pairingProvider: { pairing }, sessionSuffix: "test-" + UUID().uuidString)
+        let downloads = BackgroundDownloads(root: directory, pairingProvider: { pairing }, sessionSuffix: "test-" + UUID().uuidString, testConfiguration: .ephemeral)
         print("Network test: initializing background queue")
         await downloads.initialize(); await downloads.cancelAll()
         print("Network test: queue initialized")
@@ -187,7 +187,7 @@ final class LibraryTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(100))
         }
         await downloads.cancelAll()
-        guard let downloaded else { XCTFail("Background transfer failed: " + (downloads.error ?? "timeout")); return }
+        guard let downloaded else { XCTFail("Queued transfer failed: " + (downloads.error ?? "timeout")); return }
         let file = try await repository.fileURL(downloaded)
         XCTAssertEqual(downloaded.size, track.size)
         XCTAssertEqual(try LibraryRepository.sha256(file), downloaded.id)

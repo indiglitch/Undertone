@@ -82,6 +82,7 @@ final class BackgroundDownloads: ObservableObject {
     private let delegate: DownloadDelegate
     private let pairingProvider: @Sendable () -> PCPairing?
     private let sessionSuffix: String
+    private let testConfiguration: URLSessionConfiguration?
     private var initialized = false
     @Published private(set) var pausing = false
     private var starting = false
@@ -90,7 +91,7 @@ final class BackgroundDownloads: ObservableObject {
     private var lastProgress = Date.distantPast
     private lazy var session: URLSession = {
         let identifier = (Bundle.main.bundleIdentifier ?? "local.undertone.ios") + "." + sessionSuffix
-        let config = URLSessionConfiguration.background(withIdentifier: identifier)
+        let config = testConfiguration ?? URLSessionConfiguration.background(withIdentifier: identifier)
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
         config.waitsForConnectivity = true
@@ -101,8 +102,8 @@ final class BackgroundDownloads: ObservableObject {
     }()
     var active: Bool { records.contains { ["queued", "downloading", "installing"].contains($0.state) } }
     var title: String? { records.first { $0.state == "downloading" || $0.state == "installing" }?.track.title ?? (active ? "В очереди" : nil) }
-    init(root: URL = LibraryRepository.defaultRoot(), pairingProvider: @escaping @Sendable () -> PCPairing? = { PCKeychain.read() }, sessionSuffix: String = "original-downloads") {
-        self.pairingProvider = pairingProvider; self.sessionSuffix = sessionSuffix
+    init(root: URL = LibraryRepository.defaultRoot(), pairingProvider: @escaping @Sendable () -> PCPairing? = { PCKeychain.read() }, sessionSuffix: String = "original-downloads", testConfiguration: URLSessionConfiguration? = nil) {
+        self.pairingProvider = pairingProvider; self.sessionSuffix = sessionSuffix; self.testConfiguration = testConfiguration
         repository = LibraryRepository(root: root)
         persistence = DownloadPersistence(root: root.appendingPathComponent("Transfers", isDirectory: true))
         delegate = DownloadDelegate(pairingProvider: pairingProvider, staging: root.appendingPathComponent("Transfers", isDirectory: true))
