@@ -23,6 +23,7 @@ struct MobileSettingsView: View {
     @AppStorage("canvasEnabled") private var canvas = true
     @AppStorage("lyricsPreview") private var lyrics = true
     @AppStorage("crossfadeSeconds") private var crossfade = 0.0
+    @AppStorage("hiddenTrackIDs") private var hiddenTracks = ""
     @State private var clearHistory = false
     @State private var clearTrash = false
     var body: some View {
@@ -46,6 +47,7 @@ struct MobileSettingsView: View {
                 if !library.removed.isEmpty { Button("Отменить удаление") { Task { await library.undoRemoval() } } }
             }
             Section("Воспроизведение") {
+                if !hiddenTracks.isEmpty { Button("Показывать все скрытые треки") { hiddenTracks = "" } }
                 Text("Оригинальное качество · без перекодирования")
                 LabeledContent("Плавный переход",value:"\(Int(crossfade)) с")
                 Slider(value:$crossfade,in:0...12,step:1).accessibilityLabel("Длительность плавного перехода")

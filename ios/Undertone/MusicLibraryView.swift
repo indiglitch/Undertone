@@ -33,6 +33,7 @@ struct MusicLibraryView: View {
     @State private var removing = false
     private var effectiveQuery: String { externalQuery ?? query }
     @AppStorage("offlineMode") private var offline = false
+    @AppStorage("hiddenTrackIDs") private var hiddenValue = ""
     @AppStorage("librarySort") private var sortValue = LibrarySort.title.rawValue
     @State private var query = ""
     @State private var songs: [Song] = []
@@ -110,7 +111,13 @@ struct MusicLibraryView: View {
                     ForEach(Array(songs.enumerated()), id: \.offset) { _, song in
                         Button { if selecting { if !selected.insert(song.id).inserted { selected.remove(song.id) } } else { Task { await player.play(song, queue: songs, repository: library.repository) } } } label: {
                             HStack { if selecting { Image(systemName: selected.contains(song.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(Color.undertone) }; SongRow(song: song, liked: (song.syncID.map { pc.likedIDs.contains($0) } ?? false) || personal.state.likes.contains(song.id)) }
-                        }.buttonStyle(.plain).contextMenu {
+                        }.buttonStyle(.plain)
+                        .opacity(HiddenTrackPolicy.contains(song,in:HiddenTrackPolicy.ids(hiddenValue)) ? 0.45 : 1)
+                        .swipeActions(edge:.leading,allowsFullSwipe:false) {
+                            Button("Следующим",systemImage:"text.line.first.and.arrowtriangle.forward") { Task { await player.enqueue(song,next:true,repository:library.repository) } }.tint(Color.undertone)
+                        }
+                        .contextMenu {
+                            Button(HiddenTrackPolicy.contains(song,in:HiddenTrackPolicy.ids(hiddenValue)) ? "Показывать трек" : "Скрыть из автоматической очереди",systemImage:"eye.slash") { hiddenValue = HiddenTrackPolicy.toggled(hiddenValue,aliases:song.sourceIDs.union([song.id])) }
                             Button("Играть следующим", systemImage: "text.line.first.and.arrowtriangle.forward") { Task { await player.enqueue(song, next: true, repository: library.repository) } }
                             Button("В конец очереди", systemImage: "text.append") { Task { await player.enqueue(song, next: false, repository: library.repository) } }
                             if let id = song.syncID { trackMenu(id) } else { Button(personal.state.likes.contains(song.id) ? "Убрать из любимых" : "В любимые",systemImage:"heart") { personal.toggleLike(song.id) } }
@@ -141,6 +148,7 @@ struct MusicLibraryView: View {
                             Button("Скачать \(track.title)", systemImage: "arrow.down.circle") { pc.download([track], library: library) }
                                 .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(library.importing || offline)
                         }.contextMenu {
+                            Button(HiddenTrackPolicy.ids(hiddenValue).contains(track.id) ? "Показывать трек" : "Скрыть из автоматической очереди",systemImage:"eye.slash") { hiddenValue = HiddenTrackPolicy.toggled(hiddenValue,aliases:[track.id]) }
                             trackMenu(track.id)
                             Menu("В личный плейлист") { ForEach(personal.state.playlists) { playlist in Button(playlist.name) { personal.update { if let index = $0.playlists.firstIndex(where: { $0.id == playlist.id }), !$0.playlists[index].tracks.contains(track.id) { $0.playlists[index].tracks.append(track.id) } } } } }
                             NavigationLink { MusicLibraryView(artist:track.artist).navigationTitle(track.artist) } label: { Label("К исполнителю",systemImage:"person") }

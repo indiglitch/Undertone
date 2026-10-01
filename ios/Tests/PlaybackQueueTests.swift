@@ -67,4 +67,12 @@ final class PlaybackQueueTests: XCTestCase {
         XCTAssertNil(queue.current)
         XCTAssertTrue(queue.songs.isEmpty)
     }
+    func testHiddenTracksFollowOriginalAndDesktopAliasesAndCanBeUnhidden() {
+        var track = song("local")
+        track.syncID = "desktop"
+        let raw = HiddenTrackPolicy.toggled("",aliases:["desktop"])
+        XCTAssertTrue(HiddenTrackPolicy.contains(track,in:HiddenTrackPolicy.ids(raw)))
+        XCTAssertEqual(HiddenTrackPolicy.toggled(raw,aliases:["local","desktop"]),"")
+        XCTAssertFalse(HiddenTrackPolicy.contains(song("other"),in:HiddenTrackPolicy.ids(raw)))
+    }
 }

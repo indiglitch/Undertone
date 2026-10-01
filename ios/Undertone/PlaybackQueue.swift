@@ -97,3 +97,13 @@ enum CrossfadePolicy {
         return min(12,requested,current/2,next/2)
     }
 }
+
+enum HiddenTrackPolicy {
+    static func ids(_ raw: String) -> Set<String> { Set(raw.split(separator:"|").map(String.init)) }
+    static func contains(_ song: Song, in ids: Set<String>) -> Bool { ids.contains(song.id) || !song.sourceIDs.isDisjoint(with:ids) }
+    static func toggled(_ raw: String, aliases: Set<String>) -> String {
+        var hidden = ids(raw)
+        if !hidden.isDisjoint(with:aliases) { hidden.subtract(aliases) } else { hidden.formUnion(aliases) }
+        return hidden.sorted().joined(separator:"|")
+    }
+}

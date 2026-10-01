@@ -101,7 +101,8 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func play(_ song: Song, queue: [Song], repository: LibraryRepository) async {
-        playbackQueue.replace(queue, selected: song)
+        let hidden = HiddenTrackPolicy.ids(UserDefaults.standard.string(forKey:"hiddenTrackIDs") ?? "")
+        playbackQueue.replace(queue.filter { !HiddenTrackPolicy.contains($0,in:hidden) || $0.id == song.id }, selected: song)
         await start(song, repository: repository)
     }
 
@@ -190,8 +191,13 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func advance(_ offset: Int, automatic: Bool = false, fadeDuration: Double = 0) async {
         guard let repository else { return }
         if offset < 0 && position > 3 { seek(0); return }
-        guard let song = playbackQueue.advance(offset, automatic: automatic) else { pause(); return }
-        await start(song, repository: repository, fadeDuration:fadeDuration)
+        let hidden = HiddenTrackPolicy.ids(UserDefaults.standard.string(forKey:"hiddenTrackIDs") ?? "")
+        let repeatCurrent = playbackQueue.current.map { !HiddenTrackPolicy.contains($0,in:hidden) } ?? false
+        for _ in 0..<max(1,playbackQueue.songs.count) {
+            guard let song = playbackQueue.advance(offset, automatic: automatic && repeatCurrent) else { pause(); return }
+            if !HiddenTrackPolicy.contains(song,in:hidden) { await start(song, repository: repository, fadeDuration:fadeDuration); return }
+        }
+        pause()
     }
     func enqueue(_ song: Song, next: Bool, repository: LibraryRepository) async {
         guard current != nil else { await play(song, queue: [song], repository: repository); return }
