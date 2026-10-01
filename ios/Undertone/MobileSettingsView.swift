@@ -22,6 +22,7 @@ struct MobileSettingsView: View {
     @AppStorage("offlineMode") private var offline = false
     @AppStorage("canvasEnabled") private var canvas = true
     @AppStorage("lyricsPreview") private var lyrics = true
+    @AppStorage("crossfadeSeconds") private var crossfade = 0.0
     @State private var clearHistory = false
     @State private var clearTrash = false
     var body: some View {
@@ -46,6 +47,9 @@ struct MobileSettingsView: View {
             }
             Section("Воспроизведение") {
                 Text("Оригинальное качество · без перекодирования")
+                LabeledContent("Плавный переход",value:"\(Int(crossfade)) с")
+                Slider(value:$crossfade,in:0...12,step:1).accessibilityLabel("Длительность плавного перехода")
+                Text("Наложение следующих треков работает для файлов системного плеера. Ogg Vorbis переключается без наложения; музыкальные файлы не изменяются.").font(.caption).foregroundStyle(.secondary)
                 Text("Плеер восстанавливает очередь и позицию на паузе. Управление доступно с экрана блокировки и наушников.").font(.caption).foregroundStyle(.secondary)
             }
             Section("История") {

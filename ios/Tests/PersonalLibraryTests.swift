@@ -39,4 +39,19 @@ final class PersonalLibraryTests: XCTestCase {
         XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album/path?id=test")!))
     }
 
+    @MainActor func testNativePlayerRestoresPausedWithoutRecordingAPlay() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }
+        let repo = LibraryRepository(root:directory), storage = PlayerStorage(root:directory)
+        var bytes = Data()
+        func text(_ value:String) { bytes.append(contentsOf:value.utf8) }
+        func u16(_ value:UInt16) { var v = value.littleEndian; withUnsafeBytes(of:&v) { bytes.append(contentsOf:$0) } }
+        func u32(_ value:UInt32) { var v = value.littleEndian; withUnsafeBytes(of:&v) { bytes.append(contentsOf:$0) } }
+        text("RIFF");u32(16036);text("WAVEfmt ");u32(16);u16(1);u16(1);u32(8000);u32(16000);u16(2);u16(16);text("data");u32(16000);bytes.append(Data(repeating:0,count:16000))
+        let source = directory.appendingPathComponent("test.wav");try bytes.write(to:source); let song = try await repo.importFile(source)
+        try await storage.save(PlayerSnapshot(ids:[song.id],currentID:song.id,repeatMode:"all",position:0.3))
+        let player = MusicPlayer(storage:storage); var plays = 0; player.onTrack = { _ in plays += 1 }
+        await player.restore([song],repository:repo)
+        XCTAssertEqual(player.current?.id,song.id); XCTAssertFalse(player.playing); XCTAssertEqual(player.position,0.3,accuracy:0.03); XCTAssertEqual(player.repeatMode,.all); XCTAssertEqual(plays,0)
+    }
+
 }
