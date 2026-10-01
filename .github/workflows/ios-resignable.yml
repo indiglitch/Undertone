@@ -1,0 +1,36 @@
+name: Prepare iPhone IPA for SideStore resigning
+on:
+  push:
+    branches: ['codex/ios-companion']
+    paths: ['.github/workflows/ios-resignable.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Undertone-SideStore
+          run-id: 36905079187
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input
+      - name: Add and verify replaceable ad-hoc signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir package
+          unzip -q input/Undertone-SideStore.ipa -d package
+          codesign --force --sign - --generate-entitlement-der package/Payload/Undertone.app
+          codesign --verify --strict --verbose=2 package/Payload/Undertone.app
+          codesign --display --verbose=4 package/Payload/Undertone.app
+          cd package
+          zip -q -r ../Undertone-SideStore-resignable.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Undertone-SideStore-resignable
+          path: Undertone-SideStore-resignable.ipa
+          if-no-files-found: error
