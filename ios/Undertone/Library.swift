@@ -124,6 +124,43 @@ actor LibraryRepository {
         return song
     }
 
+    func trashSize() throws -> Int64 {
+        let directory = root.appendingPathComponent("Trash",isDirectory:true)
+        guard FileManager.default.fileExists(atPath:directory.path) else { return 0 }
+        return try FileManager.default.contentsOfDirectory(at:directory,includingPropertiesForKeys:[.fileSizeKey]).reduce(Int64(0)) { total,url in total + Int64((try? url.resourceValues(forKeys:[.fileSizeKey]).fileSize) ?? 0) }
+    }
+    func emptyTrash() throws {
+        let directory = root.appendingPathComponent("Trash",isDirectory:true)
+        if FileManager.default.fileExists(atPath:directory.path) { try FileManager.default.removeItem(at:directory) }
+    }
+    func removePhoneCopies(_ selected: [Song]) throws -> [Song] {
+        let ids = Set(selected.map(\.id)), all = try read()
+        let chosen = all.filter { ids.contains($0.id) }
+        let trash = root.appendingPathComponent("Trash", isDirectory: true)
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        var moved: [(URL,URL)] = []
+        do {
+            for song in chosen {
+                let source = try fileURL(song), destination = trash.appendingPathComponent(song.filename)
+                if FileManager.default.fileExists(atPath: source.path), !FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.moveItem(at: source, to: destination); moved.append((source,destination))
+                }
+            }
+            try write(all.filter { !ids.contains($0.id) }); return chosen
+        } catch { for (source,destination) in moved.reversed() { try? FileManager.default.moveItem(at: destination, to: source) }; throw error }
+    }
+    func restorePhoneCopies(_ selected: [Song]) throws {
+        var all = try read(), moved: [(URL,URL)] = []
+        do {
+            for song in selected where !all.contains(where: { $0.id == song.id }) {
+                let destination = try fileURL(song), source = root.appendingPathComponent("Trash").appendingPathComponent(song.filename)
+                guard FileManager.default.fileExists(atPath: source.path) else { continue }
+                if !FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.moveItem(at: source, to: destination); moved.append((source,destination)) }
+                all.append(song)
+            }
+            try write(all)
+        } catch { for (source,destination) in moved.reversed() { try? FileManager.default.moveItem(at: destination, to: source) }; throw error }
+    }
     func installDownload(_ file: URL, track: PCTrack, expectedHash: String) async throws {
         try prepare()
         let size = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -157,10 +194,25 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var installedIDs: Set<String> = []
     @Published private(set) var revision = 0
 
+    @Published private(set) var trashBytes: Int64 = 0
+    @Published private(set) var removed: [Song] = []
+    func emptyTrash() async {
+        do { try await repository.emptyTrash(); removed = []; trashBytes = 0 }
+        catch { self.error = error.localizedDescription }
+    }
+    func removeCopies(_ selected: [Song]) async {
+        do { removed = try await repository.removePhoneCopies(selected); await load() }
+        catch { self.error = error.localizedDescription }
+    }
+    func undoRemoval() async {
+        do { try await repository.restorePhoneCopies(removed); removed = []; await load() }
+        catch { self.error = error.localizedDescription }
+    }
     private var loadGeneration = 0
     func load() async {
         loadGeneration += 1; let operation = loadGeneration
         do {
+            trashBytes = try await repository.trashSize()
             let records = try await repository.read()
             guard records != songs else { return }
             let index = await Task.detached(priority: .userInitiated) {

@@ -37,21 +37,20 @@ struct Artwork: View {
 }
 
 enum MobileTab: String, CaseIterable {
-    case home = "Главная", library = "Музыка", downloads = "На iPhone", device = "Устройства"
-    var icon: String {
-        switch self {
-        case .home: return "house"
-        case .library: return "square.stack"
-        case .downloads: return "arrow.down.circle"
-        case .device: return "desktopcomputer"
-        }
-    }
+    case home = "Главная", search = "Поиск", library = "Библиотека", create = "Создать"
+    var icon: String { switch self { case .home: return "house"; case .search: return "magnifyingglass"; case .library: return "square.stack"; case .create: return "plus" } }
 }
 
 struct RootView: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: MusicPlayer
     @EnvironmentObject private var pc: PCConnection
+    @EnvironmentObject private var personal: PersonalLibrary
+    @EnvironmentObject private var sharing: ShareCoordinator
+    @AppStorage("createTabVisible") private var createVisible = true
+    @AppStorage("offlineMode") private var offline = false
+    @State private var devicePresented = false
+    @State private var creating = false
     @State private var tab: MobileTab = .home
     @State private var importer = false
     @State private var expandedPlayer = false
@@ -61,25 +60,36 @@ struct RootView: View {
             Color.canvas.ignoresSafeArea()
             RadialGradient(colors: [.undertone.opacity(0.19), .clear], center: .topTrailing, startRadius: 0, endRadius: 420).ignoresSafeArea()
             TabView(selection: $tab) {
-                ForEach(MobileTab.allCases, id: \.self) { item in
+                ForEach(MobileTab.allCases.filter { createVisible || $0 != .create }, id: \.self) { item in
                     NavigationStack {
                         Group {
-                            if item == .library || item == .downloads { MusicLibraryView(downloadsOnly: item == .downloads) }
+                            if item == .library { LibraryHubView() }
+                            else if item == .search { MobileSearchView() }
+                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Плейлист или папка") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
                             else {
                                 ScrollView {
                                     LazyVStack(alignment: .leading, spacing: 28) {
-                                        if item == .home { home } else { PCDeviceView() }
+                                        home
                                     }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 28)
                                 }.scrollContentBackground(.hidden)
                             }
                         }
                         .navigationTitle(item.rawValue)
                         .toolbar {
-                            if item != .device {
+                            if item == .home {
                                 ToolbarItem(placement: .topBarTrailing) {
                                     Button("Добавить файлы", systemImage: "plus") { importer = true }
                                         .disabled(library.importing || pc.downloading != nil)
                                 }
+                            }
+                        }
+                        .toolbar {
+                            if item == .home {
+                                ToolbarItem(placement:.topBarLeading) { Menu("Личная библиотека",systemImage:"person.crop.circle") {
+                                    NavigationLink { MobileSettingsView() } label: { Label("Настройки",systemImage:"gearshape") }
+                                    NavigationLink { RecentListeningView() } label: { Label("Недавно слушали",systemImage:"clock") }
+                                    Button("Компьютер",systemImage:"desktopcomputer") { devicePresented = true }
+                                } }
                             }
                         }
                         .safeAreaInset(edge: .bottom, spacing: 12) {
@@ -91,6 +101,10 @@ struct RootView: View {
             }
         }
         .background { DownloadErrorAlerts() }
+        .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
+        .sheet(isPresented:$creating) { CreateMusicView() }
+        .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("Компьютер").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { devicePresented = false } } } } }
+        .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
         .fileImporter(isPresented: $importer, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task { await library.importFiles(urls) }
@@ -99,11 +113,11 @@ struct RootView: View {
         }
         .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player).environmentObject(player.clock) }
         .alert("Не удалось завершить действие", isPresented: Binding(
-            get: { library.error != nil || player.error != nil || pc.error != nil },
-            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil } }
+            get: { library.error != nil || player.error != nil || pc.error != nil || personal.error != nil },
+            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil } }
         )) {
-            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil }
-        } message: { Text(library.error ?? player.error ?? pc.error ?? "") }
+            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil }
+        } message: { Text(library.error ?? player.error ?? pc.error ?? personal.error ?? "") }
     }
 
     private var home: some View {
@@ -136,7 +150,7 @@ struct RootView: View {
                     LazyHStack(alignment: .top, spacing: 18) {
                         ForEach(library.albums.keys.sorted(), id: \.self) { key in
                             if let songs = library.albums[key], let first = songs.first {
-                                Button { start(first, queue: songs) } label: {
+                                NavigationLink { MusicLibraryView(album:key).navigationTitle(first.album) } label: {
                                     VStack(alignment: .leading, spacing: 10) {
                                         CoverArtwork(id: first.syncID ?? first.id, size: 144)
                                         Text(first.album).font(.subheadline.weight(.semibold)).lineLimit(2)
@@ -148,7 +162,7 @@ struct RootView: View {
                     }
                 }
             }
-            Button { tab = .device } label: {
+            Button { devicePresented = true } label: {
                 HStack(spacing: 14) {
                     Image(systemName: "desktopcomputer").font(.title2).foregroundStyle(Color.undertone)
                     VStack(alignment: .leading, spacing: 4) {
@@ -228,6 +242,8 @@ struct RootView: View {
 struct PlayerView: View {
     @EnvironmentObject private var player: MusicPlayer
     @EnvironmentObject private var playbackClock: PlaybackClock
+    @EnvironmentObject private var personal: PersonalLibrary
+    @EnvironmentObject private var pc: PCConnection
     @Environment(\.dismiss) private var dismiss
     @State private var queuePresented = false
     @State private var seeking = false
@@ -270,6 +286,13 @@ struct PlayerView: View {
                             Button(player.repeatMode.title, systemImage: player.repeatMode.icon) { player.cycleRepeat() }
                                 .tint(player.repeatMode == .off ? .secondary : Color.undertone)
                         }.buttonStyle(.glass).controlSize(.large)
+                        if let song = player.current {
+                            HStack {
+                                Button("В любимые",systemImage:(song.syncID.map { pc.likedIDs.contains($0) } ?? personal.state.likes.contains(song.id)) ? "heart.fill" : "heart") { if let id = song.syncID { pc.edit(PCEdit(kind:"like",track:id,liked:!pc.likedIDs.contains(id))) } else { personal.toggleLike(song.id) } }
+                                ShareOriginalButton(song:song)
+                            }.buttonStyle(.glass)
+                            SongLyricsView()
+                        }
                         Label("Доступно офлайн", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
                     }.padding(.horizontal, 26).padding(.bottom, 30).frame(maxWidth: .infinity)
                 }

@@ -8,6 +8,8 @@ struct UndertoneApp: App {
     @StateObject private var library = LibraryStore()
     @StateObject private var player = MusicPlayer()
     @StateObject private var pc = PCConnection()
+    @StateObject private var personal = PersonalLibrary()
+    @StateObject private var sharing = ShareCoordinator()
 
     var body: some Scene {
         WindowGroup {
@@ -16,15 +18,17 @@ struct UndertoneApp: App {
                 .environmentObject(player)
                 .environmentObject(pc)
                 .environmentObject(downloads)
+                .environmentObject(personal)
+                .environmentObject(sharing)
                 .preferredColorScheme(.dark)
                 .tint(.undertone)
                 .task {
                     downloads.onInstall = { await library.load() }
-                    await library.load(); await pc.initialize(); await downloads.initialize(); pc.activate()
+                    await library.load(); await personal.load(); player.onTrack = { personal.record($0.id) }; await player.restore(library.songs, repository: library.repository); await pc.initialize(); await downloads.initialize(); pc.activate()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { pc.activate(); Task { await library.load() } }
-                    else { pc.deactivate() }
+                    else { player.checkpoint(); pc.deactivate() }
                 }
         }
     }

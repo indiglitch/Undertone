@@ -348,6 +348,29 @@ fn serve(
     if parts.len() != 3 || parts[0] != "GET" {
         return reply(&mut stream, "405 Method Not Allowed", b"{}").map_err(|e| e.to_string());
     }
+    if let Some(id) = parts[1]
+        .strip_prefix("/v1/lyrics/")
+        .filter(|s| s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    {
+        let db = database(&db_path).map_err(|e| e.to_string())?;
+        let content: Result<(i64, Option<String>),_> = db.query_row("SELECT l.track_id,l.plain_text FROM lyrics l JOIN track_identities i ON i.track_id=l.track_id WHERE i.sync_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?)));
+        if let Ok((track_id, plain)) = content {
+            let mut lines = vec![];
+            if let Ok(mut stmt) = db.prepare("SELECT timestamp_ms,text FROM lyric_lines WHERE track_id=?1 ORDER BY timestamp_ms,order_index") {
+                if let Ok(rows)=stmt.query_map([track_id],|r|Ok(serde_json::json!({"timestamp_ms":r.get::<_,i64>(0)?,"text":r.get::<_,String>(1)?}))) {
+                    for row in rows { if let Ok(line)=row { lines.push(line); } if lines.len()>=10000 { break; } }
+                }
+            }
+            let data = serde_json::to_vec(
+                &serde_json::json!({"plain":plain.unwrap_or_default(),"lines":lines}),
+            )
+            .map_err(|e| e.to_string())?;
+            if data.len() <= 1024 * 1024 {
+                return reply(&mut stream, "200 OK", &data).map_err(|e| e.to_string());
+            }
+        }
+        return reply(&mut stream, "404 Not Found", b"{}").map_err(|e| e.to_string());
+    }
     if parts[1] == "/v1/collections" {
         let result = collections::snapshot(&db_path)?;
         let data = serde_json::to_vec(&result).map_err(|e| e.to_string())?;

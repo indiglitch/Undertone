@@ -135,7 +135,7 @@ final class BackgroundDownloads: ObservableObject {
     }
     private func save() async { do { try await persistence.save(records) } catch { self.error = error.localizedDescription } }
     private func schedule() async {
-        guard !starting, !pausing, let pairing = pairingProvider() else { return }
+        guard !UserDefaults.standard.bool(forKey:"offlineMode"), !starting, !pausing, let pairing = pairingProvider() else { return }
         starting = true; defer { starting = false }
         while transfers.count < 2, let record = records.first(where: { $0.state == "queued" }) {
             guard let url = URL(string: pairing.address + "/v1/file/" + record.id) else { return }

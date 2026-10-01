@@ -23,6 +23,27 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var timer: AnyCancellable?
     private var observers: [AnyCancellable] = []
     private var playGeneration = 0
+    private let sessionStorage = PlayerStorage()
+    private var sessionSave: Task<Void,Never>?
+    private var lastCheckpoint = Date.distantPast
+    var onTrack: ((Song) -> Void)?
+    func checkpoint() {
+        guard let current else { return }
+        let snapshot = PlayerSnapshot(ids: playbackQueue.songs.map(\.id), currentID: current.id, repeatMode: repeatMode.rawValue, position: position.isFinite ? max(0, position) : 0)
+        let previous = sessionSave
+        sessionSave = Task { await previous?.value; do { try await sessionStorage.save(snapshot) } catch { self.error = error.localizedDescription } }
+    }
+    func restore(_ songs: [Song], repository: LibraryRepository) async {
+        guard current == nil else { return }
+        do {
+            guard let saved = try await sessionStorage.read() else { return }
+            let mapped = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { a,_ in a })
+            guard let selected = mapped[saved.currentID] else { return }
+            playbackQueue.replace(saved.ids.compactMap { mapped[$0] }, selected: selected)
+            playbackQueue.mode = RepeatMode(rawValue: saved.repeatMode) ?? .off
+            await start(selected, repository: repository, autoplay: false, initialPosition: saved.position)
+        } catch { self.error = "Не удалось восстановить плеер: " + error.localizedDescription }
+    }
 
     override init() {
         super.init()
@@ -50,6 +71,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect().sink { [weak self] _ in
             guard let self, self.playing else { return }
             self.position = self.audio?.currentTime ?? self.vorbis?.currentTime ?? 0
+            if Date().timeIntervalSince(self.lastCheckpoint) >= 5 { self.lastCheckpoint = Date(); self.checkpoint() }
         }
         observers.append(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
             .receive(on: RunLoop.main).sink { [weak self] notification in
@@ -72,7 +94,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         await start(song, repository: repository)
     }
 
-    private func start(_ song: Song, repository: LibraryRepository) async {
+    private func start(_ song: Song, repository: LibraryRepository, autoplay: Bool = true, initialPosition: Double = 0) async {
         playGeneration += 1
         let generation = playGeneration
         // Stop before awaiting file resolution; never leave the old song playing behind new metadata.
@@ -91,20 +113,23 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 }.value
                 guard generation == playGeneration else { return }
                 let candidate = prepared.player; candidate.delegate = self
-                guard candidate.play() else { throw CocoaError(.fileReadUnknown) }
+                candidate.currentTime = min(max(0, initialPosition.isFinite ? initialPosition : 0), max(0, candidate.duration - 0.01))
+                if autoplay { guard candidate.play() else { throw CocoaError(.fileReadUnknown) } }
                 audio = candidate; duration = candidate.duration
             } catch {
                 guard url.pathExtension.lowercased() == "ogg" else { throw error }
                 let candidate = try await VorbisPlayback.open(url)
                 guard generation == playGeneration else { candidate.stop(); return }
                 candidate.finished = { [weak self] in Task { @MainActor in await self?.advance(1, automatic: true) } }
-                try candidate.play(); vorbis = candidate; duration = candidate.duration
+                if initialPosition > 0 { try await candidate.seek(initialPosition) }
+                if autoplay { try candidate.play() }; vorbis = candidate; duration = candidate.duration
             }
             self.repository = repository
             current = song
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-            position = 0
-            playing = true
+            position = audio?.currentTime ?? vorbis?.currentTime ?? 0
+            playing = autoplay
+            if autoplay { onTrack?(song) }; checkpoint()
             updateNowPlaying()
             let cover = await CoverStore.shared.image(song.syncID ?? song.id)
             if generation == playGeneration, let cover {
@@ -128,10 +153,10 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         do {
             try AVAudioSession.sharedInstance().setActive(true)
             if let audio { playing = audio.play() } else { try vorbis?.play(); playing = vorbis?.playing ?? false }
-            updateNowPlaying()
+            updateNowPlaying(); if let current { onTrack?(current) }; checkpoint()
         } catch { self.error = error.localizedDescription }
     }
-    func pause() { audio?.pause(); vorbis?.pause(); playing = false; updateNowPlaying() }
+    func pause() { audio?.pause(); vorbis?.pause(); playing = false; updateNowPlaying(); checkpoint() }
     func toggle() { playing ? pause() : resume() }
     func seek(_ value: Double) {
         guard value.isFinite else { return }
@@ -139,7 +164,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if let vorbis { Task { do { try await vorbis.seek(target); position = vorbis.currentTime; updateNowPlaying() } catch { self.error = error.localizedDescription } }; return }
         audio?.currentTime = target
         position = audio?.currentTime ?? 0
-        updateNowPlaying()
+        updateNowPlaying(); checkpoint()
     }
     func advance(_ offset: Int, automatic: Bool = false) async {
         guard let repository else { return }
@@ -149,18 +174,19 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     func enqueue(_ song: Song, next: Bool, repository: LibraryRepository) async {
         guard current != nil else { await play(song, queue: [song], repository: repository); return }
-        playbackQueue.enqueue(song, next: next)
+        playbackQueue.enqueue(song, next: next); checkpoint()
     }
     func selectQueued(_ song: Song) async {
         guard let repository, let selected = playbackQueue.select(song.id) else { return }
         await start(selected, repository: repository)
     }
-    func removeUpcoming(_ offsets: IndexSet) { playbackQueue.removeUpcoming(offsets) }
-    func moveUpcoming(_ offsets: IndexSet, to destination: Int) { playbackQueue.moveUpcoming(offsets, to: destination) }
-    func clearUpcoming() { playbackQueue.clearUpcoming() }
-    func shuffleUpcoming() { playbackQueue.shuffleUpcoming() }
+    func removeUpcoming(_ offsets: IndexSet) { playbackQueue.removeUpcoming(offsets); checkpoint() }
+    func moveUpcoming(_ offsets: IndexSet, to destination: Int) { playbackQueue.moveUpcoming(offsets, to: destination); checkpoint() }
+    func clearUpcoming() { playbackQueue.clearUpcoming(); checkpoint() }
+    func shuffleUpcoming() { playbackQueue.shuffleUpcoming(); checkpoint() }
     func cycleRepeat() {
         playbackQueue.mode = repeatMode == .off ? .all : repeatMode == .all ? .one : .off
+        checkpoint()
     }
     private func updateNowPlaying() {
         guard let current else { return }

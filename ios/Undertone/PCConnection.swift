@@ -133,7 +133,7 @@ final class PCConnection: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
     func activate() {
-        guard let pairing else { return }
+        guard let pairing, !UserDefaults.standard.bool(forKey: "offlineMode") else { return }
         discovery.start(fingerprint: pairing.fingerprint)
         refreshTask?.cancel()
         refreshTask = Task {
@@ -143,6 +143,11 @@ final class PCConnection: ObservableObject {
                 do { try await Task.sleep(for: .seconds(30)) } catch { return }
             }
         }
+    }
+    func offlineChanged(_ offline: Bool) {
+        generation += 1
+        if offline { deactivate(); session?.invalidateAndCancel(); session = nil; online = false }
+        else if let pairing { configure(pairing); activate() }
     }
     func deactivate() { discovery.stop(); refreshTask?.cancel(); refreshTask = nil }
     private func configure(_ pairing: PCPairing) {
@@ -178,7 +183,7 @@ final class PCConnection: ObservableObject {
         return request
     }
     func data(_ path: String) async throws -> Data {
-        guard let session else { throw PCError.disconnected }
+        guard let session, !UserDefaults.standard.bool(forKey: "offlineMode") else { throw PCError.disconnected }
         let (data, response) = try await session.data(for: request(path))
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw PCError.rejected }
         return data
@@ -213,7 +218,7 @@ final class PCConnection: ObservableObject {
         Task { do { try await storage.save(state); await syncCollections() } catch { self.error = error.localizedDescription } }
     }
     func syncCollections(quiet: Bool = false) async {
-        guard !syncing, let session else { return }; syncing = true; defer { syncing = false }
+        guard !syncing, let session, !UserDefaults.standard.bool(forKey: "offlineMode") else { return }; syncing = true; defer { syncing = false }
         let operation = generation
         do {
             repeat {
@@ -254,6 +259,7 @@ final class PCConnection: ObservableObject {
     }
     func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {
+        guard !UserDefaults.standard.bool(forKey: "offlineMode") else { error = "Отключи офлайн-режим для загрузки с ПК."; return }
         let installed = library.installedIDs
         Task { await BackgroundDownloads.shared.enqueue(selected, installed: installed) }
     }

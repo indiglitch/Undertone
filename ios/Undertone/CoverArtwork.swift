@@ -46,7 +46,7 @@ actor CoverStore {
         try? install(bytes, id: id)
     }
     func fetchPC(_ track: PCTrack) async {
-        guard track.has_cover == true, !contains(track.id), let pairing = PCKeychain.read(),
+        guard !UserDefaults.standard.bool(forKey:"offlineMode"), track.has_cover == true, !contains(track.id), let pairing = PCKeychain.read(),
               let url = URL(string: pairing.address + "/v1/artwork/" + track.id) else { return }
         await acquire(); defer { release() }
         guard !Task.isCancelled else { return }
