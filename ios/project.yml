@@ -14,17 +14,25 @@ targets:
   Undertone:
     type: application
     platform: iOS
-    sources: [Undertone]
+    sources:
+      - Undertone
+      - path: Vorbis
+        excludes: [stb_vorbis.c, LICENSE, SOURCE.md]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: local.undertone.ios
         GENERATE_INFOPLIST_FILE: 'NO'
         INFOPLIST_FILE: Undertone/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: Vorbis/UndertoneVorbis.h
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   UndertoneTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [Tests]
+    sources:
+      - path: Tests
+        excludes: [Fixtures]
+      - path: Tests/Fixtures
+        buildPhase: resources
     dependencies:
       - target: Undertone
     settings:

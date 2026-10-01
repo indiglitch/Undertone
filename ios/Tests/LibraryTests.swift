@@ -1,5 +1,6 @@
 import XCTest
 import Combine
+import AVFoundation
 @testable import Undertone
 
 final class LibraryTests: XCTestCase {
@@ -120,5 +121,29 @@ final class LibraryTests: XCTestCase {
         let token = String(repeating: "a", count: 64), fingerprint = String(repeating: "b", count: 64)
         XCTAssertNoThrow(try PCPairing(version: 1, address: "https://undertone-" + fingerprint.prefix(16) + ".local:3210", token: token, fingerprint: fingerprint).validate())
         XCTAssertThrowsError(try PCPairing(version: 1, address: "https://other.local:3210", token: token, fingerprint: fingerprint).validate())
+    }
+
+    func testVorbisStreamsBoundedPCMAndSeeksOriginalFile() async throws {
+        let file = try XCTUnwrap(Bundle(for: LibraryTests.self).url(forResource: "tone", withExtension: "ogg"))
+        let original = try Data(contentsOf: file)
+        let reader = try VorbisReader(file: file)
+        let duration = await reader.duration
+        XCTAssertEqual(duration, 0.5, accuracy: 0.03)
+        let first = await reader.read()
+        let buffer = try XCTUnwrap(first?.buffer)
+        XCTAssertLessThanOrEqual(buffer.frameLength, 8192)
+        XCTAssertEqual(buffer.format.channelCount, 2)
+        let channel = try XCTUnwrap(buffer.floatChannelData?[0])
+        XCTAssertGreaterThan((0..<Int(buffer.frameLength)).map { abs(channel[$0]) }.reduce(0, +), 1)
+        try await reader.seek(0.25)
+        let second = await reader.read(); XCTAssertNotNil(second)
+        XCTAssertEqual(try Data(contentsOf: file), original)
+    }
+    func testNativeFLACPreparationWithoutTranscoding() throws {
+        let file = try XCTUnwrap(Bundle(for: LibraryTests.self).url(forResource: "tone", withExtension: "flac"))
+        let original = try Data(contentsOf: file)
+        let player = try AVAudioPlayer(contentsOf: file)
+        XCTAssertTrue(player.prepareToPlay()); XCTAssertEqual(player.duration, 0.5, accuracy: 0.03)
+        XCTAssertEqual(try Data(contentsOf: file), original)
     }
 }

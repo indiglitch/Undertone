@@ -164,7 +164,7 @@ final class BackgroundDownloads: ObservableObject {
         guard let index = records.firstIndex(where: { $0.taskID == task }) else { return }
         let id = records[index].id
         records[index].state = "paused"; records[index].taskID = nil
-        try? await persistence.setResume(id, data: resume); await save()
+        if let resume { try? await persistence.setResume(id, data: resume) }; await save()
         if (error as NSError).code != NSURLErrorCancelled { self.error = "Загрузка приостановлена: \(error.localizedDescription)" }
         await schedule()
     }
