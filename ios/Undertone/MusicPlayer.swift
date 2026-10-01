@@ -110,7 +110,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // Stop before awaiting file resolution; never leave the old song playing behind new metadata.
         let oldAudio = audio
         fadingAudio?.stop(); fadingAudio = nil
-        if fadeDuration <= 0 { oldAudio?.stop() }; audio = nil; vorbis?.stop(); vorbis = nil
+        if fadeDuration <= 0 { oldAudio?.stop() } else { fadingAudio = oldAudio }; audio = nil; vorbis?.stop(); vorbis = nil
         playing = false
         do {
             let url = try await repository.fileURL(song)
@@ -176,7 +176,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             updateNowPlaying(); if let current { onTrack?(current) }; checkpoint()
         } catch { self.error = error.localizedDescription }
     }
-    func pause() { fadingAudio?.stop(); fadingAudio = nil; audio?.pause(); vorbis?.pause(); playing = false; updateNowPlaying(); checkpoint() }
+    func pause() { playGeneration += 1; fadingAudio?.stop(); fadingAudio = nil; audio?.pause(); audio?.setVolume(1,fadeDuration:0); vorbis?.pause(); playing = false; updateNowPlaying(); checkpoint() }
     func toggle() { playing ? pause() : resume() }
     func seek(_ value: Double) {
         guard value.isFinite else { return }

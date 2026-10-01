@@ -92,6 +92,8 @@ final class PCConnection: ObservableObject {
     @Published private(set) var address = ""
     @Published private(set) var refreshing = false
     @Published private(set) var online = false
+    @Published private(set) var pendingPlayback: String?
+    private var playbackRequest = UUID()
     @Published private(set) var collections = PCCollections()
     @Published private(set) var likedIDs: Set<String> = []
     @Published private(set) var pendingCount = 0
@@ -252,10 +254,25 @@ final class PCConnection: ObservableObject {
         }
     }
     func disconnect() {
+        playbackRequest = UUID(); pendingPlayback = nil
         generation += 1; deactivate(); session?.invalidateAndCancel(); session = nil
         pairing = nil; address = ""; tracks = []; albums = [:]; online = false; PCKeychain.remove()
         state = PCStoredState(); publishCollections()
         Task { await BackgroundDownloads.shared.cancelAll(); try? await storage.clear() }
+    }
+    func playRemote(_ track: PCTrack, library: LibraryStore, player: MusicPlayer) async {
+        if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { await player.play(song,queue:library.sortedSongs,repository:library.repository); return }
+        guard !UserDefaults.standard.bool(forKey:"offlineMode") else { error = "Этот трек ещё не скачан на iPhone."; return }
+        let request = UUID(); playbackRequest = request; pendingPlayback = track.id; player.pause()
+        defer { if playbackRequest == request { pendingPlayback = nil } }
+        await BackgroundDownloads.shared.prioritize(track,installed:library.installedIDs)
+        for _ in 0..<1800 {
+            guard playbackRequest == request,!Task.isCancelled else { return }
+            if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { await player.play(song,queue:library.sortedSongs,repository:library.repository); return }
+            if BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "failed" { error = BackgroundDownloads.shared.error ?? "Не удалось скачать трек."; return }
+            do { try await Task.sleep(for:.milliseconds(100)) } catch { return }
+        }
+        error = "Трек ещё загружается. Он будет доступен в библиотеке после завершения."
     }
     func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {

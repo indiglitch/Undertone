@@ -30,6 +30,7 @@ struct MusicLibraryView: View {
     @State private var selected = Set<String>()
     @State private var removing = false
     private var effectiveQuery: String { externalQuery ?? query }
+    @AppStorage("offlineMode") private var offline = false
     @AppStorage("librarySort") private var sortValue = LibrarySort.title.rawValue
     @State private var query = ""
     @State private var songs: [Song] = []
@@ -121,12 +122,13 @@ struct MusicLibraryView: View {
                     ForEach(Array(remote.enumerated()), id: \.offset) { _, track in
                         HStack(spacing: 12) {
                             if selecting { Button { if !selected.insert(track.id).inserted { selected.remove(track.id) } } label: { Image(systemName:selected.contains(track.id) ? "checkmark.circle.fill" : "circle") } }
-                            CoverArtwork(id: track.id, remote: track)
-                            TrackLabels(title: track.title, artist: track.artist, format: track.format)
+                            Button { Task { await pc.playRemote(track,library:library,player:player) } } label: {
+                                HStack(spacing:12) { CoverArtwork(id:track.id,remote:track); TrackLabels(title:track.title,artist:track.artist,format:track.format); if pc.pendingPlayback == track.id { ProgressView().controlSize(.small) } }.contentShape(Rectangle())
+                            }.buttonStyle(.plain).disabled(offline).opacity(offline ? 0.45 : 1)
                             Spacer(minLength: 4)
                             if pc.likedIDs.contains(track.id) { Image(systemName: "heart.fill").font(.caption).foregroundStyle(Color.undertone) }
                             Button("Скачать \(track.title)", systemImage: "arrow.down.circle") { pc.download([track], library: library) }
-                                .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(library.importing)
+                                .labelStyle(.iconOnly).frame(width: 44, height: 44).disabled(library.importing || offline)
                         }.contextMenu {
                             trackMenu(track.id)
                             Menu("В личный плейлист") { ForEach(personal.state.playlists) { playlist in Button(playlist.name) { personal.update { if let index = $0.playlists.firstIndex(where: { $0.id == playlist.id }), !$0.playlists[index].tracks.contains(track.id) { $0.playlists[index].tracks.append(track.id) } } } } }

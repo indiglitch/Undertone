@@ -133,6 +133,13 @@ final class BackgroundDownloads: ObservableObject {
         records += tracks.filter { !installed.contains($0.id) && !existing.contains($0.id) }.map { DownloadRecord(track: $0) }
         await save(); await schedule()
     }
+    func prioritize(_ track: PCTrack, installed: Set<String>) async {
+        await enqueue([track],installed:installed)
+        if let index = records.firstIndex(where: { $0.id == track.id }), !["downloading","installing"].contains(records[index].state) {
+            var record = records.remove(at:index); record.state = "queued"; records.insert(record,at:0)
+            await save(); await schedule()
+        }
+    }
     private func save() async { do { try await persistence.save(records) } catch { self.error = error.localizedDescription } }
     private func schedule() async {
         guard !UserDefaults.standard.bool(forKey:"offlineMode"), !starting, !pausing, let pairing = pairingProvider() else { return }
