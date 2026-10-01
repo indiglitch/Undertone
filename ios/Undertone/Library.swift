@@ -1,0 +1,151 @@
+import Foundation
+import AVFoundation
+import CryptoKit
+import Combine
+
+struct Song: Codable, Identifiable, Equatable, Sendable {
+    let id: String // SHA-256 of the original bytes; PC sync identity is separate.
+    var syncID: String?
+    let filename: String
+    let title: String
+    let artist: String
+    let album: String
+    let duration: Double
+    let size: Int64
+    let format: String
+    let addedAt: Date
+}
+
+struct LibraryManifest: Codable {
+    var version = 1
+    var songs: [Song] = []
+}
+
+enum LibraryError: LocalizedError {
+    case unsupportedVersion, invalidFilename
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedVersion: return "Эта библиотека создана более новой версией Undertone."
+        case .invalidFilename: return "Некорректное имя музыкального файла."
+        }
+    }
+}
+
+actor LibraryRepository {
+    let root: URL
+    init(root: URL) { self.root = root }
+
+    static func defaultRoot() -> URL {
+        URL.applicationSupportDirectory.appendingPathComponent("Undertone", isDirectory: true)
+    }
+
+    func prepare() throws {
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("Music"), withIntermediateDirectories: true)
+    }
+
+    func read() throws -> [Song] {
+        try prepare()
+        let url = root.appendingPathComponent("library.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        let manifest = try JSONDecoder().decode(LibraryManifest.self, from: Data(contentsOf: url))
+        guard manifest.version == 1 else { throw LibraryError.unsupportedVersion }
+        return manifest.songs
+    }
+
+    func write(_ songs: [Song]) throws {
+        try prepare()
+        let data = try JSONEncoder().encode(LibraryManifest(songs: songs))
+        try data.write(to: root.appendingPathComponent("library.json"), options: .atomic)
+    }
+
+    func fileURL(_ song: Song) throws -> URL {
+        guard song.filename == (song.filename as NSString).lastPathComponent,
+              !song.filename.isEmpty, song.filename != ".", song.filename != ".." else {
+            throw LibraryError.invalidFilename
+        }
+        return root.appendingPathComponent("Music").appendingPathComponent(song.filename)
+    }
+
+    // Chunked hashing keeps large lossless files out of RAM. No tag rewriting or transcoding.
+    static func sha256(_ url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hash = SHA256()
+        while let bytes = try handle.read(upToCount: 1024 * 1024), !bytes.isEmpty { hash.update(data: bytes) }
+        return hash.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    func importFile(_ source: URL) async throws -> Song {
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        try prepare()
+        // Stage one immutable copy before hashing, so a changing source cannot invalidate identity.
+        let temporary = root.appendingPathComponent("Music").appendingPathComponent(".import-\(UUID().uuidString).\(source.pathExtension)")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try FileManager.default.copyItem(at: source, to: temporary)
+        let hash = try Self.sha256(temporary)
+        var songs = try read()
+        if let existing = songs.first(where: { $0.id == hash }),
+           FileManager.default.fileExists(atPath: try fileURL(existing).path) { return existing }
+        let ext = source.pathExtension.lowercased()
+        let filename = ext.isEmpty ? hash : "\(hash).\(ext)"
+        let destination = root.appendingPathComponent("Music").appendingPathComponent(filename)
+        // Metadata is read from the stable staged file, with the source extension as a hint.
+        let asset = AVURLAsset(url: temporary)
+        let metadata = (try? await asset.load(.commonMetadata)) ?? []
+        var title = source.deletingPathExtension().lastPathComponent
+        var artist = "Неизвестный исполнитель"
+        var album = "Без альбома"
+        for item in metadata {
+            guard let value = try? await item.load(.stringValue), !value.isEmpty else { continue }
+            switch item.commonKey {
+            case .commonKeyTitle: title = value
+            case .commonKeyArtist: artist = value
+            case .commonKeyAlbumName: album = value
+            default: break
+            }
+        }
+        let loadedDuration = try? await asset.load(.duration)
+        let duration = loadedDuration?.seconds ?? 0
+        let size = (try temporary.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        let song = Song(id: hash, syncID: nil, filename: filename, title: title, artist: artist,
+                        album: album, duration: duration.isFinite ? max(0, duration) : 0,
+                        size: Int64(size), format: ext.uppercased(), addedAt: Date())
+        if !FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.moveItem(at: temporary, to: destination)
+        }
+        songs.removeAll { $0.id == hash }
+        songs.append(song)
+        try write(songs)
+        return song
+    }
+}
+
+@MainActor
+final class LibraryStore: ObservableObject {
+    @Published private(set) var songs: [Song] = []
+    @Published private(set) var importing = false
+    @Published var error: String?
+    let repository = LibraryRepository(root: LibraryRepository.defaultRoot())
+
+    var bytes: Int64 { songs.reduce(0) { $0 + $1.size } }
+    var albums: [String: [Song]] { Dictionary(grouping: songs, by: { "\($0.artist) — \($0.album)" }) }
+
+    func load() async {
+        do { songs = try await repository.read() }
+        catch { self.error = error.localizedDescription }
+    }
+
+    func importFiles(_ urls: [URL]) async {
+        guard !importing else { return }
+        importing = true
+        defer { importing = false }
+        var failures: [String] = []
+        for url in urls {
+            do { _ = try await repository.importFile(url) }
+            catch { failures.append("\(url.lastPathComponent): \(error.localizedDescription)") }
+        }
+        await load()
+        if !failures.isEmpty { error = failures.joined(separator: "\n") }
+    }
+}
