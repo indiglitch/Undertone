@@ -33,15 +33,19 @@ actor DownloadPersistence {
 // URLSession invokes this delegate off the UI thread. Move its temporary file before returning.
 final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     weak var owner: BackgroundDownloads?
+    private let pairingProvider: @Sendable () -> PCPairing?
+    private let staging: URL
+    init(pairingProvider: @escaping @Sendable () -> PCPairing?, staging: URL) {
+        self.pairingProvider = pairingProvider; self.staging = staging; super.init()
+    }
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
                     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        guard let pairing = PCKeychain.read() else { completionHandler(.cancelAuthenticationChallenge, nil); return }
+        guard let pairing = pairingProvider() else { completionHandler(.cancelAuthenticationChallenge, nil); return }
         PinnedPCSession(pairing).urlSession(session, didReceive: challenge, completionHandler: completionHandler)
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        let staging = LibraryRepository.defaultRoot().appendingPathComponent("Transfers", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
             let file = staging.appendingPathComponent(UUID().uuidString + ".download")
@@ -73,9 +77,11 @@ final class BackgroundDownloads: ObservableObject {
     @Published var error: String?
     var onInstall: (() async -> Void)?
     var backgroundCompletion: (() -> Void)?
-    private let persistence = DownloadPersistence()
-    private let repository = LibraryRepository(root: LibraryRepository.defaultRoot())
-    private let delegate = DownloadDelegate()
+    private let persistence: DownloadPersistence
+    private let repository: LibraryRepository
+    private let delegate: DownloadDelegate
+    private let pairingProvider: @Sendable () -> PCPairing?
+    private let sessionSuffix: String
     private var initialized = false
     @Published private(set) var pausing = false
     private var starting = false
@@ -83,7 +89,7 @@ final class BackgroundDownloads: ObservableObject {
     private var pendingInstalls = 0
     private var lastProgress = Date.distantPast
     private lazy var session: URLSession = {
-        let identifier = (Bundle.main.bundleIdentifier ?? "local.undertone.ios") + ".original-downloads"
+        let identifier = (Bundle.main.bundleIdentifier ?? "local.undertone.ios") + "." + sessionSuffix
         let config = URLSessionConfiguration.background(withIdentifier: identifier)
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
@@ -95,7 +101,13 @@ final class BackgroundDownloads: ObservableObject {
     }()
     var active: Bool { records.contains { ["queued", "downloading", "installing"].contains($0.state) } }
     var title: String? { records.first { $0.state == "downloading" || $0.state == "installing" }?.track.title ?? (active ? "В очереди" : nil) }
-    private init() { delegate.owner = self }
+    init(root: URL = LibraryRepository.defaultRoot(), pairingProvider: @escaping @Sendable () -> PCPairing? = { PCKeychain.read() }, sessionSuffix: String = "original-downloads") {
+        self.pairingProvider = pairingProvider; self.sessionSuffix = sessionSuffix
+        repository = LibraryRepository(root: root)
+        persistence = DownloadPersistence(root: root.appendingPathComponent("Transfers", isDirectory: true))
+        delegate = DownloadDelegate(pairingProvider: pairingProvider, staging: root.appendingPathComponent("Transfers", isDirectory: true))
+        delegate.owner = self
+    }
     func initialize() async {
         guard !initialized else { return }; initialized = true
         do {
@@ -122,7 +134,7 @@ final class BackgroundDownloads: ObservableObject {
     }
     private func save() async { do { try await persistence.save(records) } catch { self.error = error.localizedDescription } }
     private func schedule() async {
-        guard !starting, !pausing, let pairing = PCKeychain.read() else { return }
+        guard !starting, !pausing, let pairing = pairingProvider() else { return }
         starting = true; defer { starting = false }
         while transfers.count < 2, let record = records.first(where: { $0.state == "queued" }) {
             guard let url = URL(string: pairing.address + "/v1/file/" + record.id) else { return }

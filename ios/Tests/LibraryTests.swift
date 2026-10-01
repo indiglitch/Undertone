@@ -173,9 +173,9 @@ final class LibraryTests: XCTestCase {
         print("Network test: catalog received")
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
         let catalog = try PCStorage.decodeCatalog(bytes), track = try XCTUnwrap(catalog.tracks.first)
-        let repository = LibraryRepository(root: LibraryRepository.defaultRoot()), baseline = try await repository.read()
-        let downloads = BackgroundDownloads.shared
-        try PCKeychain.save(pairing)
+        let directory = try root(); defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = LibraryRepository(root: directory)
+        let downloads = BackgroundDownloads(root: directory, pairingProvider: { pairing }, sessionSuffix: "test-" + UUID().uuidString)
         print("Network test: initializing background queue")
         await downloads.initialize(); await downloads.cancelAll()
         print("Network test: queue initialized")
@@ -186,12 +186,12 @@ final class LibraryTests: XCTestCase {
             if let song = try await repository.read().first(where: { $0.syncID == track.id }) { downloaded = song; break }
             try await Task.sleep(for: .milliseconds(100))
         }
-        await downloads.cancelAll(); PCKeychain.remove()
+        await downloads.cancelAll()
         guard let downloaded else { XCTFail("Background transfer failed: " + (downloads.error ?? "timeout")); return }
         let file = try await repository.fileURL(downloaded)
         XCTAssertEqual(downloaded.size, track.size)
         XCTAssertEqual(try LibraryRepository.sha256(file), downloaded.id)
-        try FileManager.default.removeItem(at: file); try await repository.write(baseline)
+        try FileManager.default.removeItem(at: file)
     }
 
     func testIdenticalPCFilesRetainBothPlaylistIdentities() async throws {

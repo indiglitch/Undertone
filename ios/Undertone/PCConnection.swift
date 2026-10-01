@@ -3,7 +3,7 @@ import Security
 import CryptoKit
 import Combine
 
-struct PCPairing: Codable {
+struct PCPairing: Codable, Sendable {
     let version: Int
     let address: String
     let token: String
