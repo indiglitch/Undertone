@@ -5,6 +5,7 @@ private struct BrowserKey: Equatable {
     let library: Int
     let catalog: Int
     let collections: Int
+    let sort: String
 }
 struct MusicLibraryView: View {
     @EnvironmentObject private var library: LibraryStore
@@ -14,12 +15,14 @@ struct MusicLibraryView: View {
     var playlistID: String?
     var favoritesOnly = false
     var album: String?
+    @AppStorage("librarySort") private var sortValue = LibrarySort.title.rawValue
     @State private var query = ""
     @State private var songs: [Song] = []
     @State private var remote: [PCTrack] = []
     @State private var newPlaylist = false
     @State private var renamePlaylist = false
     @State private var name = ""
+    private var sort: LibrarySort { LibrarySort(rawValue: sortValue) ?? .title }
     private var playlist: PCPlaylist? { pc.collections.playlists.first { $0.id == playlistID } }
     private var isRoot: Bool { playlistID == nil && !favoritesOnly && album == nil }
     var body: some View {
@@ -55,7 +58,11 @@ struct MusicLibraryView: View {
                     ForEach(Array(songs.enumerated()), id: \.offset) { _, song in
                         Button { Task { await player.play(song, queue: songs, repository: library.repository) } } label: {
                             SongRow(song: song, liked: song.syncID.map { pc.likedIDs.contains($0) } ?? false)
-                        }.buttonStyle(.plain).contextMenu { if let id = song.syncID { trackMenu(id) } }
+                        }.buttonStyle(.plain).contextMenu {
+                            Button("Играть следующим", systemImage: "text.line.first.and.arrowtriangle.forward") { Task { await player.enqueue(song, next: true, repository: library.repository) } }
+                            Button("В конец очереди", systemImage: "text.append") { Task { await player.enqueue(song, next: false, repository: library.repository) } }
+                            if let id = song.syncID { trackMenu(id) }
+                        }
                     }
                 }
             }
@@ -91,11 +98,20 @@ struct MusicLibraryView: View {
         .listStyle(.plain).scrollContentBackground(.hidden)
         .searchable(text: $query, prompt: "Песня, исполнитель, альбом")
         .refreshable { await pc.refresh() }
-        .task(id: BrowserKey(query: query, library: library.revision, catalog: pc.catalogRevision, collections: pc.collectionsRevision)) {
+        .toolbar {
+            if playlistID == nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu("Сортировка", systemImage: "arrow.up.arrow.down") {
+                        Picker("Сортировка", selection: $sortValue) { ForEach(LibrarySort.allCases) { Text($0.title).tag($0.rawValue) } }
+                    }
+                }
+            }
+        }
+        .task(id: BrowserKey(query: query, library: library.revision, catalog: pc.catalogRevision, collections: pc.collectionsRevision, sort: sortValue)) {
             if !query.isEmpty { try? await Task.sleep(for: .milliseconds(180)); guard !Task.isCancelled else { return } }
             let local = library.sortedSongs, tracks = pc.tracks, installed = library.installedIDs
             let likes = Set(pc.collections.likes), playlistTracks = playlistID == nil ? nil : (playlist?.tracks ?? [])
-            let album = album, query = query, favorites = favoritesOnly
+            let album = album, query = query, favorites = favoritesOnly, sort = sort
             let result = await Task.detached(priority: .userInitiated) {
                 func matches(_ title: String, _ artist: String, _ albumName: String) -> Bool {
                     (album == nil || album == "\(artist) — \(albumName)") && (query.isEmpty || "\(title) \(artist) \(albumName)".localizedCaseInsensitiveContains(query))
@@ -106,8 +122,8 @@ struct MusicLibraryView: View {
                     return (playlistTracks.compactMap { localMap[$0] }.filter { matches($0.title, $0.artist, $0.album) },
                         playlistTracks.filter { !installed.contains($0) }.compactMap { pcMap[$0] }.filter { matches($0.title, $0.artist, $0.album) })
                 }
-                return (local.filter { (!favorites || !$0.sourceIDs.isDisjoint(with: likes)) && matches($0.title, $0.artist, $0.album) },
-                    tracks.filter { !installed.contains($0.id) && (!favorites || likes.contains($0.id)) && matches($0.title, $0.artist, $0.album) })
+                return (sort.sorted(local.filter { (!favorites || !$0.sourceIDs.isDisjoint(with: likes)) && matches($0.title, $0.artist, $0.album) }),
+                    sort.sorted(tracks.filter { !installed.contains($0.id) && (!favorites || likes.contains($0.id)) && matches($0.title, $0.artist, $0.album) }))
             }.value
             guard !Task.isCancelled else { return }; songs = result.0; remote = result.1
         }

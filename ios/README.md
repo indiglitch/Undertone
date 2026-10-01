@@ -54,3 +54,7 @@ Actual refresh/update preservation needs a device test with SideStore; it is not
 - Check small-screen layout, Dynamic Type, VoiceOver, Reduce Transparency, and long titles.
 
 References: [Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass), [background audio](https://developer.apple.com/documentation/avfaudio/avaudiosession/category-swift.struct/playback), [GitHub macOS runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+## 0.4 playback convenience
+
+Queue sheet: play next, append, reorder/remove upcoming tracks, clear upcoming, shuffle remaining tracks, repeat track/all. Queue is session-local; repeated additions move the existing entry rather than duplicate it. Manual Next bypasses repeat-one. Library sorting persists in UserDefaults; playlists retain their PC order. Recently added sorts local downloads/imports by added-at; the PC catalog has no timestamp and keeps its supplied order. Deferred physical-device checks are recorded in reports/IOS_DEVICE_CHECKS_LATER.md.

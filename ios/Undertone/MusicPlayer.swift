@@ -16,7 +16,9 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var audio: AVAudioPlayer?
     private var vorbis: VorbisPlayback?
     private var resumeAfterInterruption = false
-    private var queue: [Song] = []
+    @Published private(set) var playbackQueue = PlaybackQueue()
+    var upcoming: [Song] { playbackQueue.upcoming }
+    var repeatMode: RepeatMode { playbackQueue.mode }
     private var repository: LibraryRepository?
     private var timer: AnyCancellable?
     private var observers: [AnyCancellable] = []
@@ -66,6 +68,11 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func play(_ song: Song, queue: [Song], repository: LibraryRepository) async {
+        playbackQueue.replace(queue, selected: song)
+        await start(song, repository: repository)
+    }
+
+    private func start(_ song: Song, repository: LibraryRepository) async {
         playGeneration += 1
         let generation = playGeneration
         // Stop before awaiting file resolution; never leave the old song playing behind new metadata.
@@ -90,11 +97,10 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 guard url.pathExtension.lowercased() == "ogg" else { throw error }
                 let candidate = try await VorbisPlayback.open(url)
                 guard generation == playGeneration else { candidate.stop(); return }
-                candidate.finished = { [weak self] in Task { @MainActor in await self?.advance(1) } }
+                candidate.finished = { [weak self] in Task { @MainActor in await self?.advance(1, automatic: true) } }
                 try candidate.play(); vorbis = candidate; duration = candidate.duration
             }
             self.repository = repository
-            self.queue = queue
             current = song
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             position = 0
@@ -135,13 +141,26 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         position = audio?.currentTime ?? 0
         updateNowPlaying()
     }
-    func advance(_ offset: Int) async {
-        guard let current, let index = queue.firstIndex(where: { $0.id == current.id }),
-              let repository else { return }
+    func advance(_ offset: Int, automatic: Bool = false) async {
+        guard let repository else { return }
         if offset < 0 && position > 3 { seek(0); return }
-        let next = index + offset
-        guard queue.indices.contains(next) else { pause(); return }
-        await play(queue[next], queue: queue, repository: repository)
+        guard let song = playbackQueue.advance(offset, automatic: automatic) else { pause(); return }
+        await start(song, repository: repository)
+    }
+    func enqueue(_ song: Song, next: Bool, repository: LibraryRepository) async {
+        guard current != nil else { await play(song, queue: [song], repository: repository); return }
+        playbackQueue.enqueue(song, next: next)
+    }
+    func selectQueued(_ song: Song) async {
+        guard let repository, let selected = playbackQueue.select(song.id) else { return }
+        await start(selected, repository: repository)
+    }
+    func removeUpcoming(_ offsets: IndexSet) { playbackQueue.removeUpcoming(offsets) }
+    func moveUpcoming(_ offsets: IndexSet, to destination: Int) { playbackQueue.moveUpcoming(offsets, to: destination) }
+    func clearUpcoming() { playbackQueue.clearUpcoming() }
+    func shuffleUpcoming() { playbackQueue.shuffleUpcoming() }
+    func cycleRepeat() {
+        playbackQueue.mode = repeatMode == .off ? .all : repeatMode == .all ? .one : .off
     }
     private func updateNowPlaying() {
         guard let current else { return }
@@ -161,7 +180,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         Task { @MainActor [weak self] in
             guard let self, self.audio === player else { return }
             self.playing = false
-            if flag { await self.advance(1) } else { self.updateNowPlaying() }
+            if flag { await self.advance(1, automatic: true) } else { self.updateNowPlaying() }
         }
     }
 }

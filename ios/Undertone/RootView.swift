@@ -229,6 +229,7 @@ struct PlayerView: View {
     @EnvironmentObject private var player: MusicPlayer
     @EnvironmentObject private var playbackClock: PlaybackClock
     @Environment(\.dismiss) private var dismiss
+    @State private var queuePresented = false
     @State private var seeking = false
     @State private var seekPosition = 0.0
     private func clock(_ value: Double) -> String {
@@ -264,6 +265,11 @@ struct PlayerView: View {
                                     .frame(width: 56, height: 56).buttonStyle(.glass)
                             }.labelStyle(.iconOnly)
                         }
+                        HStack(spacing: 24) {
+                            Button("Очередь", systemImage: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
+                            Button(player.repeatMode.title, systemImage: player.repeatMode.icon) { player.cycleRepeat() }
+                                .tint(player.repeatMode == .off ? .secondary : Color.undertone)
+                        }.buttonStyle(.glass).controlSize(.large)
                         Label("Доступно офлайн", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
                     }.padding(.horizontal, 26).padding(.bottom, 30).frame(maxWidth: .infinity)
                 }
@@ -272,5 +278,6 @@ struct PlayerView: View {
             .navigationTitle("Сейчас играет").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Закрыть", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) } }
         }.presentationDragIndicator(.visible)
+            .sheet(isPresented: $queuePresented) { QueueView() }
     }
 }
