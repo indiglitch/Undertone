@@ -38,10 +38,19 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: 'YES'
+  UndertoneUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Undertone
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: 'YES'
 schemes:
   Undertone:
     build:
       targets:
         Undertone: all
     test:
-      targets: [UndertoneTests]
+      targets: [UndertoneTests, UndertoneUITests]

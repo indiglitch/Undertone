@@ -24,6 +24,8 @@ struct MobileSettingsView: View {
     @AppStorage("lyricsPreview") private var lyrics = true
     @AppStorage("crossfadeSeconds") private var crossfade = 0.0
     @AppStorage("hiddenTrackIDs") private var hiddenTracks = ""
+    @EnvironmentObject private var routes: RouteCoordinator
+    @State private var scanning = false
     @State private var clearHistory = false
     @State private var clearTrash = false
     var body: some View {
@@ -58,8 +60,12 @@ struct MobileSettingsView: View {
                 NavigationLink("Недавно слушали") { RecentListeningView() }
                 Button("Очистить историю",role:.destructive) { clearHistory = true }
             }
-            Section("Undertone") { Text("Личный музыкальный плеер"); Text("Музыка и настройки хранятся на устройстве; токен подключения — в Keychain.").font(.caption).foregroundStyle(.secondary) }
+            Section("Undertone") { Button("Открыть музыкальный код", systemImage:"qrcode.viewfinder") { scanning = true }; Text("Личный музыкальный плеер"); Text("Музыка и настройки хранятся на устройстве; токен подключения — в Keychain.").font(.caption).foregroundStyle(.secondary) }
         }.navigationTitle("Настройки")
+        .sheet(isPresented: $scanning) {
+            QRScanner { code in scanning = false; if let url = URL(string: code) { routes.open(url) } }
+                .ignoresSafeArea().overlay(alignment: .topTrailing) { Button("Закрыть") { scanning = false }.buttonStyle(.glass).padding(24) }
+        }
         .confirmationDialog("Удалить файлы из корзины без возможности отмены? Оригиналы на ПК не изменятся.",isPresented:$clearTrash) { Button("Освободить место",role:.destructive) { Task { await library.emptyTrash() } } }
         .confirmationDialog("Очистить историю прослушивания и поиска?",isPresented:$clearHistory) { Button("Очистить",role:.destructive) { personal.update { $0.recents = []; $0.searches = [] } } }
     }
