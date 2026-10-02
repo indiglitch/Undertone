@@ -39,7 +39,7 @@ struct MobileSettingsView: View {
                 Toggle("OFFLINE MODE",isOn:$offline)
                     .onChange(of:offline) { _, value in pc.offlineChanged(value); Task { if value { await BackgroundDownloads.shared.pause() } } }
                 Text("Скачанная музыка доступна всегда. Офлайн-режим останавливает обращения к ПК. Загрузки работают в локальной сети Wi-Fi.").font(.caption).foregroundStyle(.secondary)
-                NavigationLink("COMPUTER") { ScrollView { PCDeviceView().padding(22) }.navigationTitle("COMPUTER") }
+                NavigationLink("COMPUTER") { ScrollView { PCDeviceView().padding(22) }.modifier(SoftScrollEdges()).navigationTitle("COMPUTER") }
             }
             Section("Память") {
                 LabeledContent("Оригинальные файлы",value:ByteCountFormatter.string(fromByteCount:library.bytes,countStyle:.file))
@@ -61,7 +61,7 @@ struct MobileSettingsView: View {
                 Button("CLEAR HISTORY",role:.destructive) { clearHistory = true }
             }
             Section("Undertone") { Button("OPEN MUSIC CODE", systemImage:"qrcode.viewfinder") { scanning = true }; Text("Личный музыкальный плеер"); Text("Музыка и настройки хранятся на устройстве; токен подключения — в Keychain.").font(.caption).foregroundStyle(.secondary) }
-        }.navigationTitle("SETTINGS")
+        }.modifier(SoftScrollEdges()).navigationTitle("SETTINGS")
         .sheet(isPresented: $scanning) {
             QRScanner { code in scanning = false; if let url = URL(string: code) { routes.open(url) } }
                 .ignoresSafeArea().overlay(alignment: .topTrailing) { Button("CLOSE") { scanning = false }.buttonStyle(.glass).padding(24) }

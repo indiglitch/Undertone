@@ -86,7 +86,7 @@ struct SongLyricsView: View {
             ScrollViewReader { proxy in ScrollView { LazyVStack(alignment:.leading,spacing:22) {
                 if let document, document.lines.isEmpty { Text(document.plain).textSelection(.enabled) }
                 else { ForEach(document?.lines ?? []) { line in Button { player.seek(Double(line.timestamp_ms)/1000) } label: { Text(line.text).font(.title2.bold()).foregroundStyle(active == line.timestamp_ms ? Color.undertone : Color.secondary).frame(maxWidth:.infinity,alignment:.leading) }.id(line.id) } }
-            }.padding(24) }.onChange(of:active) { _, value in if let value { withAnimation(.easeOut(duration:0.2)) { proxy.scrollTo(value,anchor:.center) } } } }
+            }.padding(24) }.modifier(SoftScrollEdges()).onChange(of:active) { _, value in if let value { withAnimation(.easeOut(duration:0.2)) { proxy.scrollTo(value,anchor:.center) } } } }
             .navigationTitle("Текст песни").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { expanded = false } } }
         } }
         .alert("Текст песни",isPresented:Binding(get:{error != nil},set:{if !$0 {error = nil}})) { Button("OK") { error = nil } } message: { Text(error ?? "") }

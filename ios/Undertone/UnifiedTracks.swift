@@ -140,6 +140,6 @@ struct TrackInformation: View {
             LabeledContent("Формат",value:track.song.format)
             LabeledContent("Размер",value:ByteCountFormatter.string(fromByteCount:track.song.size,countStyle:.file))
             LabeledContent("Доступность",value:track.local == nil ? "На компьютере" : "На iPhone")
-        }.navigationTitle("FILE INFO")
+        }.modifier(SoftScrollEdges()).navigationTitle("FILE INFO")
     }
 }

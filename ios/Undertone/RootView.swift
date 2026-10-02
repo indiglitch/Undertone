@@ -87,7 +87,7 @@ struct RootView: View {
         }
         .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
         .sheet(isPresented:$creating) { CreateMusicView() }
-        .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("COMPUTER").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { devicePresented = false } } } } }
+        .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.modifier(SoftScrollEdges()).navigationTitle("COMPUTER").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { devicePresented = false } } } } }
         .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
         .sheet(item:$routes.route) { MusicRouteView(route:$0) }
         .sheet(item:$routes.code) { MusicCodeView(url:$0.url) }

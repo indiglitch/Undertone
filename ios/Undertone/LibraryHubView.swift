@@ -51,7 +51,7 @@ struct CreateMusicView: View {
                     pc.edit(PCEdit(kind:"create_playlist",playlist:UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),name:name.trimmingCharacters(in:.whitespacesAndNewlines)))
                     dismiss()
                 }.disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || name.count > 120)
-            }.navigationTitle("Новый плейлист").navigationBarTitleDisplayMode(.inline)
+            }.modifier(SoftScrollEdges()).navigationTitle("Новый плейлист").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } }
         }.presentationDetents([.medium])
     }

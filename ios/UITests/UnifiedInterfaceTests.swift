@@ -14,6 +14,24 @@ final class UnifiedInterfaceTests: XCTestCase {
         XCTAssertTrue(menu.waitForExistence(timeout:10)); menu.tap()
         for title in ["PLAY NEXT","ADD TO QUEUE","ADD TO PLAYLIST"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout:3)) }
     }
+    func testShuffleIndicatesEnabledAndDisabled() {
+        let app = fixture()
+        app.buttons["OPEN PLAYER"].tap()
+        let shuffle = app.buttons["SHUFFLE UPCOMING"]
+        XCTAssertTrue(shuffle.waitForExistence(timeout:8))
+        XCTAssertEqual(shuffle.value as? String,"OFF")
+        shuffle.tap(); XCTAssertEqual(shuffle.value as? String,"ON")
+        shuffle.tap(); XCTAssertEqual(shuffle.value as? String,"OFF")
+    }
+    func testQueueEditAndSelectHaveSeparateHitAreas() {
+        let app = fixture()
+        app.buttons["OPEN PLAYER"].tap()
+        let queue = app.buttons["QUEUE"]; XCTAssertTrue(queue.waitForExistence(timeout:8)); queue.tap()
+        let edit = app.buttons["EDIT"], select = app.buttons["SELECT"]
+        XCTAssertTrue(edit.waitForExistence(timeout:8)); XCTAssertTrue(select.isHittable)
+        XCTAssertLessThan(edit.frame.maxX,select.frame.minX)
+        select.tap(); XCTAssertTrue(app.buttons["DONE"].exists)
+    }
     func testRemoteTapShowsShortNonblockingErrorAndOneTrackList() {
         let app = fixture("search")
         XCTAssertTrue(app.staticTexts["Far away"].waitForExistence(timeout:10))

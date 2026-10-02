@@ -32,7 +32,7 @@ struct PlaylistEditorView: View {
                     .onMove { order.move(fromOffsets:$0,toOffset:$1) }
                     if order.isEmpty { Text("Добавь треки из меню песни").foregroundStyle(.secondary) }
                 }
-            }.environment(\.editMode,.constant(.active))
+            }.modifier(SoftScrollEdges()).environment(\.editMode,.constant(.active))
             .navigationTitle("EDIT PLAYLIST").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement:.topBarLeading) { Button("CANCEL") { dismiss() } }
