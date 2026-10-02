@@ -72,47 +72,7 @@ struct RootView: View {
         ZStack {
             Color.canvas.ignoresSafeArea()
             RadialGradient(colors: [.undertone.opacity(0.19), .clear], center: .topTrailing, startRadius: 0, endRadius: 420).ignoresSafeArea()
-            TabView(selection: $tab) {
-                ForEach(MobileTab.allCases.filter { createVisible || $0 != .create }, id: \.self) { item in
-                    NavigationStack {
-                        Group {
-                            if item == .library { LibraryHubView() }
-                            else if item == .search { MobileSearchView() }
-                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Плейлист или папка") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
-                            else {
-                                ScrollView {
-                                    LazyVStack(alignment: .leading, spacing: 28) {
-                                        home
-                                    }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
-                                }.scrollContentBackground(.hidden)
-                            }
-                        }
-                        .navigationTitle(item.rawValue)
-                        .navigationBarTitleDisplayMode(item == .home ? .inline : .large)
-                        .toolbar {
-                            if item == .home {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Добавить файлы", systemImage: "plus") { importer = true }
-                                        .disabled(library.importing || pc.downloading != nil)
-                                }
-                            }
-                        }
-                        .toolbar {
-                            if item == .home {
-                                ToolbarItem(placement:.topBarLeading) { Menu("Личная библиотека",systemImage:"person.crop.circle") {
-                                    NavigationLink { MobileSettingsView() } label: { Label("Настройки",systemImage:"gearshape") }
-                                    NavigationLink { RecentListeningView() } label: { Label("Недавно слушали",systemImage:"clock") }
-                                    Button("Компьютер",systemImage:"desktopcomputer") { devicePresented = true }
-                                } }
-                            }
-                        }
-                    }
-                    .tabItem { Label(item.rawValue, systemImage: item.icon) }.tag(item)
-                }
-            }
-            .modifier(CompactPlayerAccessory(enabled: player.current != nil, accessory: Group {
-                if let song = player.current { miniPlayer(song) }
-            }))
+            tabs
         }
         .background { DownloadErrorAlerts() }
         .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
@@ -134,6 +94,55 @@ struct RootView: View {
         )) {
             Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil; routes.error = nil }
         } message: { Text(library.error ?? player.error ?? pc.error ?? personal.error ?? routes.error ?? "") }
+    }
+
+    private var tabs: some View {
+        TabView(selection: $tab) {
+            ForEach(MobileTab.allCases.filter { createVisible || $0 != .create }, id: \.self) { item in
+                tabScreen(item).tabItem { Label(item.rawValue, systemImage: item.icon) }.tag(item)
+            }
+        }.modifier(CompactPlayerAccessory(enabled: player.current != nil, accessory: playerAccessory))
+    }
+    private var playerAccessory: some View {
+        Group { if let song = player.current { miniPlayer(song) } }
+    }
+    private func tabScreen(_ item: MobileTab) -> some View {
+NavigationStack {
+                        tabPage(item)
+                        .navigationTitle(item.rawValue)
+                        .navigationBarTitleDisplayMode(item == .home ? .inline : .large)
+                        .toolbar {
+                            if item == .home {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Добавить файлы", systemImage: "plus") { importer = true }
+                                        .disabled(library.importing || pc.downloading != nil)
+                                }
+                            }
+                        }
+                        .toolbar {
+                            if item == .home {
+                                ToolbarItem(placement:.topBarLeading) { Menu("Личная библиотека",systemImage:"person.crop.circle") {
+                                    NavigationLink { MobileSettingsView() } label: { Label("Настройки",systemImage:"gearshape") }
+                                    NavigationLink { RecentListeningView() } label: { Label("Недавно слушали",systemImage:"clock") }
+                                    Button("Компьютер",systemImage:"desktopcomputer") { devicePresented = true }
+                                } }
+                            }
+                        }
+                    }
+    }
+    private func tabPage(_ item: MobileTab) -> some View {
+Group {
+                            if item == .library { LibraryHubView() }
+                            else if item == .search { MobileSearchView() }
+                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Плейлист или папка") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
+                            else {
+                                ScrollView {
+                                    LazyVStack(alignment: .leading, spacing: 28) {
+                                        home
+                                    }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
+                                }.scrollContentBackground(.hidden)
+                            }
+                        }
     }
 
     private var home: some View {
