@@ -18,7 +18,7 @@ struct PlaylistContextMenu: View {
         ShareLink(item:MusicLinks.make("playlist",playlist.id)) { Label("SHARE",systemImage:"square.and.arrow.up") }
         Button("DELETE PLAYLIST",systemImage:"trash",role:.destructive) { pc.edit(PCEdit(kind:"delete_playlist",playlist:playlist.id)) }
     }
-    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { guard !source.isEmpty, !shuffle || source.count > 1 else { ActionFeedback.failed(); return }; if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
 }
 struct AlbumContextMenu: View {
     @EnvironmentObject private var library: LibraryStore
@@ -35,7 +35,7 @@ struct AlbumContextMenu: View {
         Button(personal.state.pins.contains("album:" + name) ? "UNPIN" : "PIN",systemImage:"pin") { personal.togglePin("album:" + name) }
         ShareLink(item:MusicLinks.make("album",name)) { Label("SHARE",systemImage:"square.and.arrow.up") }
     }
-    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { guard !source.isEmpty, !shuffle || source.count > 1 else { ActionFeedback.failed(); return }; if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
 }
 struct SharedPlaylistLink: View {
     let playlist: PCPlaylist
@@ -43,7 +43,7 @@ struct SharedPlaylistLink: View {
     var body: some View {
         HStack {
             NavigationLink { MusicLibraryView(playlistID:playlist.id).navigationTitle(playlist.name) } label: { Label(playlist.name,systemImage:"music.note.list").lineLimit(2).frame(maxWidth:.infinity,alignment:.leading) }
-            Menu { PlaylistContextMenu(playlist:playlist) { editing = true } } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню " + playlist.name)
+            Menu { PlaylistContextMenu(playlist:playlist) { editing = true } } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.buttonStyle(.borderless).accessibilityLabel("Меню " + playlist.name)
         }.contextMenu { PlaylistContextMenu(playlist:playlist) { editing = true } }
             .sheet(isPresented:$editing) { PlaylistEditorView(id:playlist.id,isPC:true) }
     }
@@ -53,7 +53,7 @@ struct SharedAlbumLink: View {
     var body: some View {
         HStack {
             NavigationLink { MusicLibraryView(album:name).navigationTitle(name) } label: { Label(name,systemImage:"square.stack").lineLimit(2) }
-            Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню " + name)
+            Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.buttonStyle(.borderless).accessibilityLabel("Меню " + name)
         }.contextMenu { AlbumContextMenu(name:name) }
     }
 }
@@ -74,7 +74,7 @@ struct AlbumTile: View {
             HStack(spacing:0) {
                 Text(first?.song.artist ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength:0)
-                Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню альбома " + name)
+                Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.buttonStyle(.borderless).accessibilityLabel("Меню альбома " + name)
             }
         }.frame(width:116,alignment:.leading).contextMenu { AlbumContextMenu(name:name) }
     }

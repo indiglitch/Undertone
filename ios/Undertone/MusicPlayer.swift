@@ -189,7 +189,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } catch { self.error = error.localizedDescription }
     }
     func pause() { playGeneration += 1; fadingAudio?.stop(); fadingAudio = nil; audio?.pause(); audio?.setVolume(1,fadeDuration:0); vorbis?.pause(); playing = false; updateNowPlaying(); checkpoint() }
-    func toggle() { playing ? pause() : resume() }
+    func toggle() { guard current != nil else { ActionFeedback.failed(); return }; playing ? pause() : resume() }
     func seek(_ value: Double) {
         guard value.isFinite else { return }
         let target = min(max(0, value), duration)
@@ -204,7 +204,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let hidden = HiddenTrackPolicy.ids(UserDefaults.standard.string(forKey:"hiddenTrackIDs") ?? "")
         let repeatCurrent = playbackQueue.current.map { !HiddenTrackPolicy.contains($0,in:hidden) } ?? false
         for _ in 0..<max(1,playbackQueue.songs.count) {
-            guard let song = playbackQueue.advance(offset, automatic: automatic && repeatCurrent) else { pause(); return }
+            guard let song = playbackQueue.advance(offset, automatic: automatic && repeatCurrent) else { if !automatic { ActionFeedback.failed() }; pause(); return }
             if !HiddenTrackPolicy.contains(song,in:hidden) { await start(song, repository: repository, fadeDuration:fadeDuration); return }
         }
         pause()
@@ -230,7 +230,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         playbackQueue.removeFiles(ids); checkpoint()
     }
-    func shuffleUpcoming() { playbackQueue.shuffleUpcoming(); checkpoint() }
+    func shuffleUpcoming() { guard shuffled || upcoming.count >= 2 else { ActionFeedback.failed(); return }; playbackQueue.shuffleUpcoming(); checkpoint() }
     func cycleRepeat() {
         playbackQueue.mode = repeatMode == .off ? .all : repeatMode == .all ? .one : .off
         checkpoint()

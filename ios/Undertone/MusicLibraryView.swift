@@ -41,9 +41,12 @@ struct MusicLibraryView: View {
             }
             if entries.isEmpty { ContentUnavailableView(effectiveQuery.isEmpty ? "Пока нет музыки" : "Ничего не найдено",systemImage:"music.note",description:Text(effectiveQuery.isEmpty ? "Подключи ПК или добавь аудиофайлы." : effectiveQuery)) }
         }.listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
+            .navigationBarTitleDisplayMode(.inline)
             .modifier(OptionalMusicSearch(query:$query,enabled:externalQuery == nil))
             .refreshable { await pc.migratePlaylists(personal,library:library); await pc.refresh() }
             .toolbar {
+                if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) { NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") } } }
+
                 if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) {
                     Menu("LIST ACTIONS",systemImage:"ellipsis") {
                         Button(selecting ? "DONE" : "SELECT TRACKS") { selecting.toggle(); selected = [] }
@@ -86,7 +89,7 @@ struct MusicLibraryView: View {
             }.disabled(selected.isEmpty)
         }
     }
-    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { guard !source.isEmpty, !shuffle || source.count > 1 else { ActionFeedback.failed(); return }; if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
     private func rebuild() async {
         if !effectiveQuery.isEmpty { try? await Task.sleep(for:.milliseconds(180)); guard !Task.isCancelled else { return } }
         let local = library.songs, remote = pc.tracks, order = orderedIDs ?? playlist?.tracks

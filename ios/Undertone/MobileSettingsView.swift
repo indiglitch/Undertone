@@ -39,6 +39,7 @@ struct MobileSettingsView: View {
                 Toggle("OFFLINE MODE",isOn:$offline)
                     .onChange(of:offline) { _, value in pc.offlineChanged(value); Task { if value { await BackgroundDownloads.shared.pause() } } }
                 Text("Скачанная музыка доступна всегда. Офлайн-режим останавливает обращения к ПК. Загрузки работают в локальной сети Wi-Fi.").font(.caption).foregroundStyle(.secondary)
+                NavigationLink("DOWNLOADS") { DownloadsView() }
                 NavigationLink("COMPUTER") { ScrollView { PCDeviceView().padding(22) }.modifier(SoftScrollEdges()).navigationTitle("COMPUTER") }
             }
             Section("Память") {

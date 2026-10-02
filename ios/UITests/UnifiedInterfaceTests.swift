@@ -55,4 +55,36 @@ final class UnifiedInterfaceTests: XCTestCase {
         XCTAssertTrue(app.buttons["downloadPlaylist"].exists)
         XCTAssertFalse(app.buttons["В папку"].exists)
     }
+    func testDownloadsCanBeOpenedFromHome() {
+        let app = fixture()
+        app.buttons["openDownloads"].tap()
+        XCTAssertTrue(app.navigationBars["DOWNLOADS"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["NO DOWNLOADS"].waitForExistence(timeout:5))
+    }
+    func testLibraryAndTrackCollectionHaveVisibleTitles() {
+        let app = fixture()
+        app.tabBars.buttons["LIBRARY"].tap()
+        XCTAssertTrue(app.navigationBars["LIBRARY"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.navigationBars["LIBRARY"].staticTexts["LIBRARY"].isHittable)
+        app.buttons["ALL TRACKS"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["ALL TRACKS"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.navigationBars["ALL TRACKS"].staticTexts["ALL TRACKS"].isHittable)
+    }
+    func testRecentlyPlayedHeadingOpensHistory() {
+        let app = fixture()
+        let history = app.buttons["openRecentlyPlayed"]
+        for _ in 0..<3 { if history.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(history.isHittable); history.tap()
+        XCTAssertTrue(app.navigationBars["RECENTLY PLAYED"].waitForExistence(timeout:5))
+    }
+
+    func testAlbumsHeadingOpensAllAlbums() {
+        let app = fixture()
+        let albums = app.buttons["openAllAlbums"]
+        for _ in 0..<5 { if albums.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(albums.isHittable); albums.tap()
+        XCTAssertTrue(app.navigationBars["ALBUMS"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["Demo Artist — Night drive"].exists)
+    }
+
 }

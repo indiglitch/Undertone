@@ -33,6 +33,8 @@ actor DownloadPersistence {
 // URLSession invokes this delegate off the UI thread. Move its temporary file before returning.
 final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     weak var owner: BackgroundDownloads?
+    private let progressLock = NSLock()
+    private var progressTimes: [Int: TimeInterval] = [:]
     private let pairingProvider: @Sendable () -> PCPairing?
     private let staging: URL
     init(pairingProvider: @escaping @Sendable () -> PCPairing?, staging: URL) {
@@ -55,13 +57,20 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
         } catch { Task { @MainActor [weak owner] in owner?.error = error.localizedDescription } }
     }
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        progressLock.lock(); progressTimes.removeValue(forKey:task.taskIdentifier); progressLock.unlock()
         guard let error else { return }
         let resume = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
         Task { @MainActor [weak owner] in await owner?.failed(task.taskIdentifier, error: error, resume: resume) }
     }
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                     totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        Task { @MainActor [weak owner] in owner?.progress(downloadTask.taskIdentifier, bytes: totalBytesWritten) }
+        let now = Date.timeIntervalSinceReferenceDate
+        progressLock.lock()
+        let deliver = now - (progressTimes[downloadTask.taskIdentifier] ?? 0) >= 0.5
+        if deliver { progressTimes[downloadTask.taskIdentifier] = now }
+        progressLock.unlock()
+        guard deliver else { return }
+        Task { @MainActor [weak owner] in owner?.progress(downloadTask.taskIdentifier, bytes: totalBytesWritten, expected:totalBytesExpectedToWrite) }
     }
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         Task { @MainActor [weak owner] in await owner?.finishBackgroundEvents() }
@@ -72,7 +81,7 @@ final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked S
 final class BackgroundDownloads: ObservableObject {
     static let shared = BackgroundDownloads()
     @Published private(set) var records: [DownloadRecord] = []
-    @Published private(set) var received: Int64 = 0
+    let progressState = DownloadProgress()
     @Published private(set) var completed = 0
     private(set) var canceledIDs = Set<String>()
     @Published var error: String?
@@ -89,7 +98,6 @@ final class BackgroundDownloads: ObservableObject {
     private var starting = false
     private var transfers: [Int: URLSessionDownloadTask] = [:]
     private var pendingInstalls = 0
-    private var lastProgress = Date.distantPast
     private lazy var session: URLSession = {
         let identifier = (Bundle.main.bundleIdentifier ?? "local.undertone.ios") + "." + sessionSuffix
         let config = testConfiguration ?? URLSessionConfiguration.background(withIdentifier: identifier)
@@ -171,15 +179,15 @@ final class BackgroundDownloads: ObservableObject {
             await save(); task.resume()
         }
     }
-    func progress(_ task: Int, bytes: Int64) {
-        guard transfers[task] != nil, Date().timeIntervalSince(lastProgress) >= 0.5 else { return }
-        lastProgress = Date(); received = bytes
+    func progress(_ task: Int, bytes: Int64, expected: Int64 = 0) {
+        guard let id = transfers[task]?.taskDescription else { return }
+        progressState.update(id,bytes:bytes,expected:expected)
     }
     func finished(_ task: Int, trackID: String?, file: URL, response: HTTPURLResponse?) async {
         pendingInstalls += 1
         defer { pendingInstalls -= 1; completeBackgroundIfReady(); try? FileManager.default.removeItem(at: file) }
         guard let index = records.firstIndex(where: { $0.taskID == task || ($0.id == trackID && $0.state != "paused") }) else { return }
-        let record = records[index]; records[index].state = "installing"; transfers.removeValue(forKey: task)
+        let record = records[index]; progressState.remove(record.id); records[index].state = "installing"; transfers.removeValue(forKey: task)
         await save()
         do {
             guard let response, [200, 206].contains(response.statusCode), let hash = response.value(forHTTPHeaderField: "X-Content-SHA256"), hash.count == 64 else { throw PCError.rejected }
@@ -221,7 +229,7 @@ final class BackgroundDownloads: ObservableObject {
         await save(); await schedule()
     }
     func cancel(_ id: String) async {
-        canceledIDs.insert(id)
+        progressState.remove(id); canceledIDs.insert(id)
         let tasks = transfers.values.filter { $0.taskDescription == id }
         for task in tasks { transfers.removeValue(forKey:task.taskIdentifier) }
         records.removeAll { $0.id == id }; await save(); tasks.forEach { $0.cancel() }; try? await persistence.setResume(id,data:nil); await schedule()

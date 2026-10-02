@@ -80,11 +80,11 @@ struct UnifiedTrackRow: View {
                 }.contentShape(Rectangle())
             }.buttonStyle(PressFeedbackStyle())
             Menu { TrackContextMenu(track: track, playlistID: playlistID) } label: { Image(systemName:"ellipsis").frame(width:44,height:44).contentShape(Rectangle()) }
-                .accessibilityLabel("Меню " + track.song.title)
+                .buttonStyle(.borderless).accessibilityLabel("Меню " + track.song.title)
         }.padding(.vertical, 5).padding(.horizontal, 6)
             .background(current ? Color.undertone.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius:12))
             .contextMenu { TrackContextMenu(track: track, playlistID: playlistID) }
-            .modifier(SoftScrollItem())
+            .contentShape(.contextMenuPreview,RoundedRectangle(cornerRadius:12))
     }
 }
 

@@ -67,6 +67,12 @@ struct RootView: View {
     @State private var tab: MobileTab = .home
     @State private var importer = false
     @State private var expandedPlayer = false
+    @State private var playlistOffset = 0
+    @State private var albumOffset = 0
+    @State private var homeEntries: [UnifiedTrack] = []
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
 
     var body: some View {
         ZStack {
@@ -115,8 +121,11 @@ struct RootView: View {
 NavigationStack {
                         tabPage(item)
                         .navigationTitle(item.rawValue)
-                        .navigationBarTitleDisplayMode(item == .home || item == .search ? .inline : .large)
+                        .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
+                            ToolbarItem(placement:.topBarTrailing) {
+                                NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }.accessibilityIdentifier("openDownloads")
+                            }.sharedBackgroundVisibility(.hidden)
                             if item == .home {
                                 ToolbarItem(placement: .topBarTrailing) {
                                     Button("SYNC", systemImage:"arrow.triangle.2.circlepath") {
@@ -136,6 +145,7 @@ NavigationStack {
                                 ToolbarItem(placement:.topBarLeading) { Menu("PERSONAL LIBRARY",systemImage:"person.crop.circle") {
                                     NavigationLink { MobileSettingsView() } label: { Label("SETTINGS",systemImage:"gearshape") }
                                     NavigationLink { RecentListeningView() } label: { Label("RECENTLY PLAYED",systemImage:"clock") }
+                                    NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }
                                     Button("COMPUTER",systemImage:"desktopcomputer") { devicePresented = true }
                                 } }
                             }
@@ -168,25 +178,50 @@ Group {
                 NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("LIKED TRACKS") } label: { homeShortcut("LIKED TRACKS",icon:"heart.fill") }
                 NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("ALL TRACKS") } label: { homeShortcut("ALL TRACKS",icon:"music.note") }
                 Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "CONNECT PC" : "PC LIBRARY",icon:"desktopcomputer") }
-                ForEach(pc.collections.playlists.prefix(2)) { playlist in
-                    SharedPlaylistLink(playlist:playlist).frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
-                }
             }.buttonStyle(PressFeedbackStyle())
+            if !pc.collections.playlists.isEmpty {
+                HStack {
+                    NavigationLink { LibraryHubView(initialFilter:"Плейлисты").navigationTitle("PLAYLISTS") } label: { Text("PLAYLISTS").font(.title3.bold()) }
+                    Spacer()
+                    Button("REFRESH PLAYLISTS",systemImage:"arrow.clockwise") {
+                        guard pc.collections.playlists.count > 3 else { ActionFeedback.failed(); return }
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration:0.3)) { playlistOffset = HomeRotation.next(playlistOffset,count:pc.collections.playlists.count) }
+                    }.labelStyle(.iconOnly).frame(width:44,height:44).accessibilityIdentifier("refreshHomePlaylists")
+                }
+                VStack(spacing:6) {
+                    ForEach(HomeRotation.page(pc.collections.playlists,offset:playlistOffset)) { playlist in
+                        SharedPlaylistLink(playlist:playlist).frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
+                    }
+                }.id(playlistOffset).transition(.opacity)
+            }
             if library.songs.isEmpty && pc.tracks.isEmpty {
                 emptyLibrary
             } else {
-                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "RECENTLY PLAYED", detail: "Твоя библиотека")
-                songList(homeTracks)
-                sectionHeading("Альбомы", detail: "\(Set(library.albums.keys).union(pc.albums.keys).count)")
+                NavigationLink { RecentListeningView() } label: { sectionHeading("RECENTLY PLAYED",detail:personal.state.recents.isEmpty ? "Недавние добавления" : "VIEW ALL") }.accessibilityIdentifier("openRecentlyPlayed")
+                songList(homeEntries)
+                NavigationLink { AllAlbumsView() } label: { sectionHeading("ALBUMS",detail:"VIEW ALL") }.accessibilityIdentifier("openAllAlbums")
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(Array(Set(library.albums.keys).union(pc.albums.keys)).sorted(),id: \.self) { AlbumTile(name:$0) }
-                    }
+                        ForEach(HomeRotation.page(albumNames,offset:albumOffset),id: \.self) { AlbumTile(name:$0) }
+                    }.id(albumOffset).transition(.opacity)
                 }
             }
 
         }
+        .task(id:"\(library.revision)|\(pc.catalogRevision)|\(personal.revision)") {
+            let local = library.songs, remote = pc.tracks, recents = personal.state.recents
+            let result = await Task.detached(priority:.userInitiated) { Array(TrackCatalog.merged(local:local,remote:remote,order:recents.isEmpty ? nil : recents,sort:.newest).prefix(8)) }.value
+            if !Task.isCancelled { homeEntries = result }
+        }
+        .task(id:tab == .home && scenePhase == .active) {
+            guard tab == .home, scenePhase == .active else { return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for:.seconds(15)) } catch { return }
+                withAnimation(reduceMotion ? nil : .easeInOut(duration:0.45)) { albumOffset = HomeRotation.next(albumOffset,count:albumNames.count) }
+            }
+        }
     }
+    private var albumNames: [String] { Array(Set(library.albums.keys).union(pc.albums.keys)).sorted() }
 
     private var emptyLibrary: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -206,10 +241,6 @@ Group {
     }
     private func sectionHeading(_ title: String, detail: String) -> some View {
         HStack { Text(title).font(.title3.bold()); Spacer(); Text(detail).font(.caption).foregroundStyle(.secondary) }
-    }
-    private var homeTracks: [UnifiedTrack] {
-        let all = TrackCatalog.merged(local:library.songs,remote:pc.tracks,sort:.newest)
-        return Array((personal.state.recents.isEmpty ? all : TrackCatalog.merged(local:library.songs,remote:pc.tracks,order:personal.state.recents)).prefix(8))
     }
     private func songList(_ tracks: [UnifiedTrack]) -> some View {
         LazyVStack(spacing:4) { ForEach(tracks) { track in UnifiedTrackRow(track:track,queue:tracks.map(\.song)) } }
@@ -233,7 +264,7 @@ Group {
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
             Button("NEXT TRACK", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
-            Menu { TrackContextMenu(track:UnifiedTrack(song)) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню " + song.title)
+            Menu { TrackContextMenu(track:UnifiedTrack(song)) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.buttonStyle(.borderless).accessibilityLabel("Меню " + song.title)
         }.padding(.horizontal, 12).padding(.vertical, 4)
             .contextMenu { TrackContextMenu(track:UnifiedTrack(song)) }
     }
@@ -315,7 +346,7 @@ struct PlayerView: View {
     private var transport: some View {
         HStack(spacing: 0) {
             playerButton("SHUFFLE UPCOMING", icon: "shuffle") { player.shuffleUpcoming() }
-                .disabled(player.upcoming.count < 2 && !player.shuffled)
+                .opacity(player.upcoming.count < 2 && !player.shuffled ? 0.45 : 1)
                 .foregroundStyle(player.shuffled ? Color.undertone : .white)
                 .background(player.shuffled ? Color.undertone.opacity(0.18) : .clear,in:Circle())
                 .accessibilityValue(player.shuffled ? "ON" : "OFF")

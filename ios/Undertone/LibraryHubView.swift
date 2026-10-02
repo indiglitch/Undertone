@@ -5,6 +5,7 @@ struct LibraryHubView: View {
     @EnvironmentObject private var pc: PCConnection
     @EnvironmentObject private var personal: PersonalLibrary
     @State private var filter = "Всё"
+    init(initialFilter:String = "Всё") { _filter = State(initialValue:initialFilter) }
     @State private var query = ""
     @State private var creating = false
     private func matches(_ name: String) -> Bool { query.isEmpty || name.localizedCaseInsensitiveContains(query) }
@@ -36,6 +37,7 @@ struct LibraryHubView: View {
         }.listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
             .searchable(text:$query,prompt:"Поиск в библиотеке")
             .sheet(isPresented:$creating) { CreateMusicView() }
+            .navigationBarTitleDisplayMode(.inline)
     }
 }
 struct CreateMusicView: View {
@@ -105,11 +107,25 @@ struct MobileSearchView: View {
 
 struct RecentListeningView: View {
     @EnvironmentObject private var personal: PersonalLibrary
-    var body: some View { MusicLibraryView(downloadsOnly: true, orderedIDs: personal.state.recents, showRoot: false).navigationTitle("RECENTLY PLAYED") }
+    var body: some View { MusicLibraryView(orderedIDs: personal.state.recents, showRoot: false).navigationTitle("RECENTLY PLAYED") }
 }
 
 private struct LibraryPinSwipe: ViewModifier {
     @EnvironmentObject private var personal: PersonalLibrary
     let id: String
     func body(content: Content) -> some View { content.swipeActions(edge:.leading) { Button { personal.togglePin(id) } label: { Label(personal.state.pins.contains(id) ? "UNPIN" : "PIN",systemImage:"pin") }.tint(.undertone) } }
+}
+
+struct AllAlbumsView: View {
+    @EnvironmentObject private var library: LibraryStore
+    @EnvironmentObject private var pc: PCConnection
+    @State private var query = ""
+    private var names: [String] { Set(library.albums.keys).union(pc.albums.keys).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
+    var body: some View {
+        List {
+            ForEach(names,id:\.self) { SharedAlbumLink(name:$0) }
+            if names.isEmpty { ContentUnavailableView("NO ALBUMS",systemImage:"square.stack") }
+        }.listStyle(.plain).scrollContentBackground(.hidden).modifier(SoftScrollEdges())
+            .searchable(text:$query,prompt:"Поиск альбомов").navigationTitle("ALBUMS").navigationBarTitleDisplayMode(.inline)
+    }
 }

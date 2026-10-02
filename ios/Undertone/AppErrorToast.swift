@@ -26,6 +26,7 @@ struct AppErrorToast: View {
             .onAppear { if let error { show(error) } }
     }
     private func show(_ text: String) {
+        ActionFeedback.failed()
         message = String(text.prefix(140))
         player.error = nil; downloads.error = nil; pc.error = nil; library.error = nil; personal.error = nil; routes.error = nil
         dismissal?.cancel()

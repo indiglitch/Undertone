@@ -15,7 +15,7 @@ struct QueueView: View {
                 Section {
                     HStack {
                         Button("SHUFFLE", systemImage: "shuffle") { player.shuffleUpcoming() }
-                            .disabled(player.upcoming.count < 2 && !player.shuffled)
+                            .opacity(player.upcoming.count < 2 && !player.shuffled ? 0.45 : 1)
                             .foregroundStyle(player.shuffled ? Color.undertone : .primary)
                             .accessibilityValue(player.shuffled ? "ON" : "OFF")
                         Spacer()

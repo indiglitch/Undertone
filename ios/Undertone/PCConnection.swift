@@ -325,6 +325,7 @@ final class PCConnection: ObservableObject {
     }
     func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {
+        guard !selected.isEmpty, selected.contains(where:{ !library.installedIDs.contains($0.id) }) else { ActionFeedback.failed(); return }
         guard !UserDefaults.standard.bool(forKey: "offlineMode") else { error = "Отключи офлайн-режим для загрузки с ПК."; return }
         let installed = library.installedIDs
         Task { await BackgroundDownloads.shared.enqueue(selected, installed: installed) }
