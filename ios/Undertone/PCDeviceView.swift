@@ -15,22 +15,22 @@ struct PCDeviceView: View {
             } else {
                 Text(pc.address).font(.caption).foregroundStyle(.secondary)
                 Label("\(pc.tracks.count) треков в каталоге", systemImage: "music.note.list")
-                Button(pc.refreshing ? "Обновляем…" : "Обновить библиотеку", systemImage: "arrow.clockwise") { Task { await pc.refresh() } }.buttonStyle(.glass).disabled(pc.refreshing)
-                Button("Скачать всю библиотеку", systemImage: "arrow.down.circle") { pc.download(pc.tracks, library: library) }.buttonStyle(.glassProminent).disabled(pc.tracks.isEmpty || pc.downloading != nil || library.importing)
-                NavigationLink { PendingEditsView() } label: { Label("Синхронизация · \(pc.pendingCount)", systemImage: "arrow.triangle.2.circlepath") }
+                Button(pc.refreshing ? "SYNCING…" : "SYNC LIBRARY", systemImage: "arrow.clockwise") { Task { await pc.refresh() } }.buttonStyle(.glass).disabled(pc.refreshing)
+                Button("DOWNLOAD LIBRARY", systemImage: "arrow.down.circle") { pc.download(pc.tracks, library: library) }.buttonStyle(.glassProminent).disabled(pc.tracks.isEmpty || pc.downloading != nil || library.importing)
+                NavigationLink { PendingEditsView() } label: { Label("SYNC · \(pc.pendingCount)", systemImage: "arrow.triangle.2.circlepath") }
                 DownloadStatus()
-                Button("Отключить компьютер", role: .destructive) { pc.disconnect() }
+                Button("DISCONNECT COMPUTER", role: .destructive) { pc.disconnect() }
             }
-            Button("Сканировать QR-код", systemImage: "qrcode.viewfinder") { scanning = true }.buttonStyle(.glassProminent).disabled(pc.downloading != nil)
+            Button("SCAN QR CODE", systemImage: "qrcode.viewfinder") { scanning = true }.buttonStyle(.glassProminent).disabled(pc.downloading != nil)
             DisclosureGroup("Вставить код вручную") {
                 TextEditor(text: $code).frame(height: 100).font(.caption).autocorrectionDisabled().textInputAutocapitalization(.never)
-                Button("Подключить") { Task { await pc.pair(code) } }.disabled(code.isEmpty || pc.downloading != nil)
+                Button("CONNECT") { Task { await pc.pair(code) } }.disabled(code.isEmpty || pc.downloading != nil)
             }
             Text("После скачивания музыка работает без ПК и интернета. Подключение сохраняется, компьютер обнаруживается автоматически. Доступ можно приостановить в настройках ПК.").font(.caption).foregroundStyle(.secondary)
         }
         .sheet(isPresented: $scanning) {
             QRScanner { value in scanning = false; Task { await pc.pair(value) } }
-                .ignoresSafeArea().overlay(alignment: .topTrailing) { Button("Закрыть") { scanning = false }.buttonStyle(.glass).padding(24) }
+                .ignoresSafeArea().overlay(alignment: .topTrailing) { Button("CLOSE") { scanning = false }.buttonStyle(.glass).padding(24) }
         }
     }
 }

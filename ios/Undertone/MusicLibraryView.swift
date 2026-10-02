@@ -24,7 +24,7 @@ struct MusicLibraryView: View {
     @State private var selected = Set<String>()
     @State private var editing = false
     private var playlist: PCPlaylist? { pc.collections.playlists.first { $0.id == playlistID } }
-    private var title: String { displayTitle ?? playlist?.name ?? album ?? artist ?? (favoritesOnly ? "Любимые треки" : "Музыка") }
+    private var title: String { displayTitle ?? playlist?.name ?? album ?? artist ?? (favoritesOnly ? "LIKED TRACKS" : "Музыка") }
     private var hasHeader: Bool { playlistID != nil || album != nil || artist != nil || favoritesOnly }
     private var effectiveQuery: String { externalQuery ?? query }
     private var refreshKey: String { "\(library.revision)|\(pc.catalogRevision)|\(pc.collectionsRevision)|\(personal.revision)|\(effectiveQuery)|\(sortValue)" }
@@ -32,21 +32,21 @@ struct MusicLibraryView: View {
         List {
             if hasHeader { collectionHeader }
             if selecting { bulkActions }
-            if !library.removed.isEmpty { Button("Отменить удаление",systemImage:"arrow.uturn.backward") { Task { await library.undoRemoval() } } }
+            if !library.removed.isEmpty { Button("UNDO DELETE",systemImage:"arrow.uturn.backward") { Task { await library.undoRemoval() } } }
             ForEach(entries) { track in
                 HStack(spacing: 4) {
-                    if selecting { Button { if !selected.insert(track.id).inserted { selected.remove(track.id) } } label: { Image(systemName:selected.contains(track.id) ? "checkmark.circle.fill" : "circle").frame(width:32,height:44) }.buttonStyle(.plain) }
+                    if selecting { Button { if !selected.insert(track.id).inserted { selected.remove(track.id) } } label: { Image(systemName:selected.contains(track.id) ? "checkmark.circle.fill" : "circle").frame(width:32,height:44) }.buttonStyle(PressFeedbackStyle()) }
                     UnifiedTrackRow(track:track,queue:entries.map(\.song),playlistID:playlistID)
                 }.listRowInsets(EdgeInsets(top:0,leading:10,bottom:0,trailing:10))
             }
             if entries.isEmpty { ContentUnavailableView(effectiveQuery.isEmpty ? "Пока нет музыки" : "Ничего не найдено",systemImage:"music.note",description:Text(effectiveQuery.isEmpty ? "Подключи ПК или добавь аудиофайлы." : effectiveQuery)) }
-        }.listStyle(.plain).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
+        }.listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
             .modifier(OptionalMusicSearch(query:$query,enabled:externalQuery == nil))
             .refreshable { await pc.migratePlaylists(personal,library:library); await pc.refresh() }
             .toolbar {
                 if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) {
-                    Menu("Действия со списком",systemImage:"ellipsis") {
-                        Button(selecting ? "Завершить выбор" : "Выбрать треки") { selecting.toggle(); selected = [] }
+                    Menu("LIST ACTIONS",systemImage:"ellipsis") {
+                        Button(selecting ? "DONE" : "SELECT TRACKS") { selecting.toggle(); selected = [] }
                         Picker("Сортировка",selection:$sortValue) { ForEach(LibrarySort.allCases) { Text($0.title).tag($0.rawValue) } }
                         if let playlist { PlaylistContextMenu(playlist:playlist) { editing = true } }
                         if let album { AlbumContextMenu(name:album) }
@@ -68,8 +68,8 @@ struct MusicLibraryView: View {
                 }
             }.padding(.vertical,8)
             HStack {
-                Button("Слушать",systemImage:"play.fill") { play(entries) }.buttonStyle(.glassProminent)
-                Button("Перемешать",systemImage:"shuffle") { play(entries.shuffled()) }.labelStyle(.iconOnly).frame(width:44,height:44)
+                Button("PLAY",systemImage:"play.fill") { play(entries) }.buttonStyle(.glassProminent)
+                Button("SHUFFLE",systemImage:"shuffle") { play(entries.shuffled()) }.labelStyle(.iconOnly).frame(width:44,height:44)
                 Spacer()
                 if let album { Menu { AlbumContextMenu(name:album) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) } }
                 if let playlist { Menu { PlaylistContextMenu(playlist:playlist) { editing = true } } label: { Image(systemName:"ellipsis").frame(width:44,height:44) } }
@@ -78,11 +78,11 @@ struct MusicLibraryView: View {
     }
     private var bulkActions: some View {
         Section("Выбрано: \(selected.count)") {
-            Menu("Действия с выбранными") {
-                Button("Скачать оригиналы") { pc.download(entries.filter { selected.contains($0.id) }.compactMap(\.remote),library:library) }
-                Menu("В плейлист") { ForEach(pc.collections.playlists) { p in Button(p.name) { pc.edit(PCEdit(kind:"add_tracks",playlist:p.id,tracks:entries.filter { selected.contains($0.id) }.map(\.id))) } } }
-                Button("В любимые") { for track in entries where selected.contains(track.id) { if track.id.count == 32 { pc.edit(PCEdit(kind:"like",track:track.id,liked:true)) } else { personal.update { $0.likes.insert(track.id) } } } }
-                Button("Удалить копии с iPhone",role:.destructive) { let songs = entries.filter { selected.contains($0.id) }.compactMap(\.local); Task { await library.removeCopies(songs); player.forgetFiles(Set(songs.map(\.id))) }; selected = [] }
+            Menu("SELECTION ACTIONS") {
+                Button("DOWNLOAD ORIGINALS") { pc.download(entries.filter { selected.contains($0.id) }.compactMap(\.remote),library:library) }
+                Menu("ADD TO PLAYLIST") { ForEach(pc.collections.playlists) { p in Button(p.name) { pc.edit(PCEdit(kind:"add_tracks",playlist:p.id,tracks:entries.filter { selected.contains($0.id) }.map(\.id))) } } }
+                Button("LIKE") { for track in entries where selected.contains(track.id) { if track.id.count == 32 { pc.edit(PCEdit(kind:"like",track:track.id,liked:true)) } else { personal.update { $0.likes.insert(track.id) } } } }
+                Button("REMOVE PHONE COPIES",role:.destructive) { let songs = entries.filter { selected.contains($0.id) }.compactMap(\.local); Task { await library.removeCopies(songs); player.forgetFiles(Set(songs.map(\.id))) }; selected = [] }
             }.disabled(selected.isEmpty)
         }
     }
@@ -114,14 +114,14 @@ struct DownloadStatus: View {
                     ForEach(Array(downloads.records.prefix(30))) { record in HStack {
                         VStack(alignment:.leading) { Text(record.track.title).font(.caption).lineLimit(1); Text(["queued":"В очереди","downloading":"Загрузка","installing":"Проверка оригинала","paused":"Приостановлено","failed":"Ошибка"][record.state] ?? record.state).font(.caption2).foregroundStyle(.secondary) }
                         Spacer()
-                        if ["paused","failed"].contains(record.state) { Button("Повторить",systemImage:"arrow.clockwise") { Task { await downloads.retry(record.id) } }.labelStyle(.iconOnly) }
-                        Button("Отменить",systemImage:"xmark") { Task { await downloads.cancel(record.id) } }.labelStyle(.iconOnly)
+                        if ["paused","failed"].contains(record.state) { Button("RETRY",systemImage:"arrow.clockwise") { Task { await downloads.retry(record.id) } }.labelStyle(.iconOnly) }
+                        Button("CANCEL",systemImage:"xmark") { Task { await downloads.cancel(record.id) } }.labelStyle(.iconOnly)
                     } }
                 }
                 Text("Можно заблокировать iPhone. Для передачи ПК должен работать, а телефон — оставаться в Wi-Fi.").font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button(downloads.active ? "Приостановить" : "Продолжить") { Task { if downloads.active { await downloads.pause() } else { await downloads.resume() } } }
-                    Button("Очистить очередь", role: .destructive) { Task { await downloads.cancelAll() } }
+                    Button(downloads.active ? "PAUSE" : "RESUME") { Task { if downloads.active { await downloads.pause() } else { await downloads.resume() } } }
+                    Button("CLEAR QUEUE", role: .destructive) { Task { await downloads.cancelAll() } }
                 }.buttonStyle(.glass).disabled(downloads.pausing)
             }.padding(20).modifier(GlassSurface())
         }
@@ -132,7 +132,7 @@ struct DownloadErrorAlerts: View {
     @EnvironmentObject private var downloads: BackgroundDownloads
     var body: some View {
         Color.clear.frame(width: 0, height: 0).alert("Загрузка", isPresented: Binding(get: { downloads.error != nil }, set: { if !$0 { downloads.error = nil } })) {
-            Button("Понятно", role: .cancel) { downloads.error = nil }
+            Button("OK", role: .cancel) { downloads.error = nil }
         } message: { Text(downloads.error ?? "") }
     }
 }

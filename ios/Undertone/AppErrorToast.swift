@@ -16,7 +16,7 @@ struct AppErrorToast: View {
                 HStack(spacing:10) {
                     Image(systemName:"exclamationmark.circle.fill").foregroundStyle(Color.undertone)
                     Text(message).font(.subheadline).lineLimit(2).frame(maxWidth:.infinity,alignment:.leading)
-                    Button("Закрыть",systemImage:"xmark") { self.message = nil }.labelStyle(.iconOnly).frame(width:44,height:44)
+                    Button("CLOSE",systemImage:"xmark") { self.message = nil }.labelStyle(.iconOnly).frame(width:44,height:44)
                 }.padding(.horizontal,14).padding(.vertical,4)
                     .background(Color(red:0.16,green:0.13,blue:0.20),in:RoundedRectangle(cornerRadius:18))
                     .shadow(color:.black.opacity(0.3),radius:12,y:4)

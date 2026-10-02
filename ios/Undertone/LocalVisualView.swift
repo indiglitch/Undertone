@@ -29,13 +29,13 @@ struct LocalVisualView: View {
     @State private var error: String?
     var body: some View {
         VStack(alignment:.leading,spacing:12) {
-            HStack { Text("Твоё видео").font(.headline); Spacer(); Menu("Видео",systemImage:"ellipsis") {
-                Button("Добавить MP4 / MOV") { importing = true }
-                Toggle("Зацикленное видео без звука",isOn:$canvasEnabled)
-                if file != nil { Button("Удалить видео",role:.destructive) { if let id = player.current?.id { Task { try? await LocalVideoStorage.shared.remove(id); video?.pause(); video = nil; loop = nil; file = nil } } } }
+            HStack { Text("Твоё видео").font(.headline); Spacer(); Menu("VIDEO",systemImage:"ellipsis") {
+                Button("ADD MP4 / MOV") { importing = true }
+                Toggle("MUTED VIDEO LOOP",isOn:$canvasEnabled)
+                if file != nil { Button("DELETE VIDEO",role:.destructive) { if let id = player.current?.id { Task { try? await LocalVideoStorage.shared.remove(id); video?.pause(); video = nil; loop = nil; file = nil } } } }
             } }
             if let video,canvasEnabled { VideoPlayer(player:video).frame(height:220).clipShape(RoundedRectangle(cornerRadius:18)) }
-            if file != nil { Button(videoMode ? "Вернуться к музыке" : "Открыть видео со звуком") { if videoMode { video?.pause(); player.resume() } else { player.pause(); video?.pause() }; videoMode.toggle() } }
+            if file != nil { Button(videoMode ? "BACK TO MUSIC" : "PLAY VIDEO") { if videoMode { video?.pause(); player.resume() } else { player.pause(); video?.pause() }; videoMode.toggle() } }
             else { Text("Добавить клип к треку можно через меню ⋯").font(.caption).foregroundStyle(.secondary) }
         }.padding(file == nil ? 14 : 20).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:20))
         .task(id:player.current?.id) { video?.pause(); video = nil; loop = nil; file = nil; guard let id = player.current?.id else { return }; await load(id) }
@@ -45,7 +45,7 @@ struct LocalVisualView: View {
         .onDisappear { video?.pause() }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.movie]) { result in Task { do { guard let id = player.current?.id else { return }; try await LocalVideoStorage.shared.install(result.get(),id:id); await load(id) } catch { self.error = error.localizedDescription } } }
         .sheet(isPresented:$videoMode) { if let file { LocalMusicVideoView(url:file) } }
-        .alert("Видео",isPresented:Binding(get:{error != nil},set:{if !$0 {error = nil}})) { Button("Понятно") { error = nil } } message: { Text(error ?? "") }
+        .alert("VIDEO",isPresented:Binding(get:{error != nil},set:{if !$0 {error = nil}})) { Button("OK") { error = nil } } message: { Text(error ?? "") }
     }
     private func load(_ id: String) async {
         file = try? await LocalVideoStorage.shared.file(id); guard let file else { return }
@@ -58,7 +58,7 @@ struct LocalMusicVideoView: View {
     let url: URL
     @State private var video: AVPlayer?
     var body: some View {
-        NavigationStack { Group { if let video { VideoPlayer(player:video).ignoresSafeArea(edges:.bottom) } }.navigationTitle("Видео").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("К музыке") { dismiss() } } } }
+        NavigationStack { Group { if let video { VideoPlayer(player:video).ignoresSafeArea(edges:.bottom) } }.navigationTitle("VIDEO").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("GO TO MUSIC") { dismiss() } } } }
             .onAppear { let player = AVPlayer(url:url); video = player; player.seek(to:CMTime(seconds:music.position,preferredTimescale:600)); player.play() }
             .onDisappear { let position = video?.currentTime().seconds ?? music.position; video?.pause(); music.seek(position); music.resume() }
     }

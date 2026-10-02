@@ -60,21 +60,21 @@ struct SongLyricsView: View {
     private var active: Int64? { document?.lines.last(where: { Double($0.timestamp_ms) <= clock.position*1000 })?.timestamp_ms }
     var body: some View {
         VStack(alignment:.leading,spacing:12) {
-            HStack { Text("Текст песни").font(.headline); Spacer(); Menu("Текст",systemImage:"ellipsis") {
-                Button("Импортировать LRC / TXT") { importing = true }
-                Toggle("Предпросмотр",isOn:$preview)
-                if let document { ShareLink(item:document.plain) { Label("Поделиться текстом",systemImage:"square.and.arrow.up") } }
+            HStack { Text("Текст песни").font(.headline); Spacer(); Menu("LYRICS",systemImage:"ellipsis") {
+                Button("IMPORT LRC / TXT") { importing = true }
+                Toggle("PREVIEW",isOn:$preview)
+                if let document { ShareLink(item:document.plain) { Label("SHARE LYRICS",systemImage:"square.and.arrow.up") } }
             } }
             if let document {
                 if preview { Text(document.lines.first(where: { $0.timestamp_ms == active })?.text ?? String(document.plain.prefix(240))).font(.title3.weight(.semibold)).lineLimit(4) }
-                Button("Открыть полный текст",systemImage:"arrow.up.left.and.arrow.down.right") { expanded = true }
+                Button("FULL LYRICS",systemImage:"arrow.up.left.and.arrow.down.right") { expanded = true }
             } else { Text("Текст пока не добавлен. Можно импортировать свой LRC или TXT; тексты с ПК кэшируются для офлайн-прослушивания.").font(.caption).foregroundStyle(.secondary) }
         }.padding(20).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:24))
-        .task(id:player.current?.id) {
+        .task(id:"\(player.current?.id ?? ""):\(pc.online):\(pc.catalogRevision)") {
             document = nil; guard let song = player.current else { return }
             document = try? await LyricsStorage.shared.read(song.id)
-            if document == nil, let id = song.syncID, let bytes = try? await pc.data("/v1/lyrics/" + id), let doc = try? JSONDecoder().decode(LyricsDocument.self,from:bytes) {
-                guard player.current?.id == song.id else { return }; document = doc; try? await LyricsStorage.shared.save(doc,id:song.id)
+            if let doc = await pc.cacheLyrics(song) {
+                guard !Task.isCancelled, player.current?.id == song.id else { return }; document = doc
             }
         }
         .fileImporter(isPresented:$importing,allowedContentTypes:[.plainText,UTType(filenameExtension:"lrc") ?? .plainText]) { result in
@@ -85,8 +85,8 @@ struct SongLyricsView: View {
                 if let document, document.lines.isEmpty { Text(document.plain).textSelection(.enabled) }
                 else { ForEach(document?.lines ?? []) { line in Button { player.seek(Double(line.timestamp_ms)/1000) } label: { Text(line.text).font(.title2.bold()).foregroundStyle(active == line.timestamp_ms ? Color.undertone : Color.secondary).frame(maxWidth:.infinity,alignment:.leading) }.id(line.id) } }
             }.padding(24) }.onChange(of:active) { _, value in if let value { withAnimation(.easeOut(duration:0.2)) { proxy.scrollTo(value,anchor:.center) } } } }
-            .navigationTitle("Текст песни").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { expanded = false } } }
+            .navigationTitle("Текст песни").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { expanded = false } } }
         } }
-        .alert("Текст песни",isPresented:Binding(get:{error != nil},set:{if !$0 {error = nil}})) { Button("Понятно") { error = nil } } message: { Text(error ?? "") }
+        .alert("Текст песни",isPresented:Binding(get:{error != nil},set:{if !$0 {error = nil}})) { Button("OK") { error = nil } } message: { Text(error ?? "") }
     }
 }

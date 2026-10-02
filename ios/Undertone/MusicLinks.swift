@@ -38,7 +38,7 @@ struct MusicRouteView: View {
                     if pc.collections.playlists.contains(where:{$0.id == route.value.replacingOccurrences(of:"-",with:"").lowercased()}) { MusicLibraryView(playlistID:route.value.replacingOccurrences(of:"-",with:"").lowercased()).navigationTitle("Плейлист") }
                     else { ContentUnavailableView("Плейлист не найден",systemImage:"music.note.list",description:Text("Ссылка открывает объект в твоей библиотеке. Она не передаёт музыку или доступ к ПК.")) }
                 }
-            }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { dismiss() } } }
+            }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } }
         }
     }
 }
@@ -51,8 +51,8 @@ struct MusicCodeView: View {
             if let image { Image(uiImage:image).interpolation(.none).resizable().scaledToFit().frame(width:250,height:250).padding(15).background(.white,in:RoundedRectangle(cornerRadius:24)) }
             Text("Код Undertone").font(.title.bold())
             Text("Открывает объект в библиотеке получателя. Музыка и ключ подключения к ПК не передаются.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            ShareLink(item:url) { Label("Поделиться ссылкой",systemImage:"square.and.arrow.up") }
-        }.padding(24).navigationTitle("Поделиться").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { dismiss() } } } }
+            ShareLink(item:url) { Label("SHARE LINK",systemImage:"square.and.arrow.up") }
+        }.padding(24).navigationTitle("SHARE").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } } }
         .task { let filter = CIFilter.qrCodeGenerator(); filter.message = Data(url.absoluteString.utf8); if let output = filter.outputImage, let cg = CIContext().createCGImage(output.transformed(by:CGAffineTransform(scaleX:8,y:8)),from:output.extent.applying(CGAffineTransform(scaleX:8,y:8))) { image = UIImage(cgImage:cg) } }
     }
 }

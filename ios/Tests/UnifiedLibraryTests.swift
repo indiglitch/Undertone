@@ -2,6 +2,20 @@ import XCTest
 @testable import Undertone
 
 final class UnifiedLibraryTests: XCTestCase {
+    func testShuffleCanBeDisabledWithoutMovingCurrentOrLosingQueueEdits() {
+        let songs = (0..<8).map { local(String($0),title:String($0)) }
+        var queue = PlaybackQueue(); queue.replace(songs,selected:songs[0])
+        queue.shuffleUpcoming(); XCTAssertTrue(queue.shuffled)
+        XCTAssertEqual(queue.current?.id,songs[0].id)
+        XCTAssertEqual(Set(queue.upcoming.map(\.id)),Set(songs.dropFirst().map(\.id)))
+        let added = local("new"); queue.enqueue(added,next:false)
+        queue.shuffleUpcoming(); XCTAssertFalse(queue.shuffled)
+        XCTAssertEqual(queue.upcoming.map(\.id),songs.dropFirst().map(\.id)+[added.id])
+    }
+    func testCollectionsEqualityDetectsRealChanges() {
+        var a = PCCollections(); let b = a; XCTAssertEqual(a,b)
+        a.playlists = [PCPlaylist(id:"a",name:"New",tracks:[])]; XCTAssertNotEqual(a,b)
+    }
     private let a = String(repeating:"a",count:32), b = String(repeating:"b",count:32)
     private func local(_ id: String, sync: String? = nil, title: String = "Alpha") -> Song { Song(id:id,syncID:sync,filename:"file.wav",title:title,artist:"Artist",album:"Album",duration:10,size:100,format:"WAV",addedAt:Date()) }
     private func remote(_ id: String, title: String) -> PCTrack { PCTrack(sync_id:id,title:title,artist:"Artist",album:"Album",duration:10,format:"WAV",size:100) }

@@ -6,7 +6,7 @@ struct PCPlaylist: Codable, Identifiable, Sendable, Equatable {
     var tracks: [String]
     var description: String? = nil
 }
-struct PCCollections: Codable, Sendable {
+struct PCCollections: Codable, Sendable, Equatable {
     var likes: [String] = []
     var playlists: [PCPlaylist] = []
     mutating func apply(_ edit: PCEdit) {

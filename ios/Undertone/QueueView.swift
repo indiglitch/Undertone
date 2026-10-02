@@ -3,6 +3,7 @@ import SwiftUI
 struct QueueView: View {
     @EnvironmentObject private var player: MusicPlayer
     @Environment(\.dismiss) private var dismiss
+    @State private var editMode: EditMode = .inactive
     @State private var selecting = false
     @State private var selected = Set<String>()
     var body: some View {
@@ -13,7 +14,7 @@ struct QueueView: View {
                 }
                 Section {
                     HStack {
-                        Button("Перемешать", systemImage: "shuffle") { player.shuffleUpcoming() }
+                        Button("SHUFFLE", systemImage: "shuffle") { player.shuffleUpcoming() }
                             .disabled(player.upcoming.count < 2)
                         Spacer()
                         Button(player.repeatMode.title, systemImage: player.repeatMode.icon) { player.cycleRepeat() }
@@ -31,16 +32,18 @@ struct QueueView: View {
                     .onMove { player.moveUpcoming($0, to: $1) }
                     if player.upcoming.isEmpty { Text("Добавь треки через меню песни").foregroundStyle(.secondary) }
                 }
-                if selecting { Button("Удалить выбранные · \(selected.count)",role:.destructive) {
+                if selecting { Button("REMOVE SELECTED · \(selected.count)",role:.destructive) {
                     player.removeUpcoming(IndexSet(player.upcoming.enumerated().filter { selected.contains($0.element.id) }.map(\.offset))); selected = []
                 }.disabled(selected.isEmpty) }
-                if !player.upcoming.isEmpty { Button("Очистить следующие треки", role: .destructive) { player.clearUpcoming() } }
+                if !player.upcoming.isEmpty { Button("CLEAR UPCOMING", role: .destructive) { player.clearUpcoming() } }
             }
-            .scrollContentBackground(.hidden).background(Color.canvas)
-            .navigationTitle("Очередь").navigationBarTitleDisplayMode(.inline)
+            .modifier(SoftScrollEdges()).scrollContentBackground(.hidden).background(Color.canvas)
+            .environment(\.editMode,$editMode)
+            .navigationTitle("QUEUE").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { HStack { EditButton(); Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } } }
-                ToolbarItem(placement: .topBarTrailing) { Button("Закрыть", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }
+                ToolbarItem(placement: .topBarLeading) { Button(editMode == .active ? "DONE" : "EDIT") { selecting = false; selected = []; editMode = editMode == .active ? .inactive : .active } }.sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .topBarTrailing) { Button(selecting ? "DONE" : "SELECT") { editMode = .inactive; selecting.toggle(); selected = [] }.padding(.trailing,12) }.sharedBackgroundVisibility(.hidden)
+                ToolbarItem(placement: .topBarTrailing) { Button("CLOSE", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }
             }
         }.modifier(MusicModalScope()).presentationDragIndicator(.visible)
     }

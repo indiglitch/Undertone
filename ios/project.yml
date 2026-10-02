@@ -9,7 +9,7 @@ settings:
     TARGETED_DEVICE_FAMILY: '1'
     CODE_SIGNING_ALLOWED: 'NO'
     CURRENT_PROJECT_VERSION: '1'
-    MARKETING_VERSION: '0.6.0'
+    MARKETING_VERSION: '0.6.1'
 targets:
   Undertone:
     type: application

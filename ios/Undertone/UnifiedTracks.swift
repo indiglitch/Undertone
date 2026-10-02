@@ -78,12 +78,13 @@ struct UnifiedTrackRow: View {
                     else if track.local != nil { Image(systemName:"checkmark.circle.fill").font(.caption).foregroundStyle(.secondary) }
                     else { Image(systemName:"arrow.down.circle").font(.caption).foregroundStyle(.secondary) }
                 }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }.buttonStyle(PressFeedbackStyle())
             Menu { TrackContextMenu(track: track, playlistID: playlistID) } label: { Image(systemName:"ellipsis").frame(width:44,height:44).contentShape(Rectangle()) }
                 .accessibilityLabel("Меню " + track.song.title)
         }.padding(.vertical, 5).padding(.horizontal, 6)
             .background(current ? Color.undertone.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius:12))
             .contextMenu { TrackContextMenu(track: track, playlistID: playlistID) }
+            .modifier(SoftScrollItem())
     }
 }
 
@@ -101,32 +102,32 @@ struct TrackContextMenu: View {
     private var liked: Bool { pc.likedIDs.contains(syncID) || personal.state.likes.contains(track.song.id) }
     var body: some View { primaryActions; libraryActions; fileActions }
     @ViewBuilder private var primaryActions: some View {
-        Button(liked ? "Убрать из любимых" : "В любимые", systemImage: liked ? "heart.slash" : "heart") {
+        Button(liked ? "UNLIKE" : "LIKE", systemImage: liked ? "heart.slash" : "heart") {
             if syncID.count == 32 { pc.edit(PCEdit(kind:"like",track:syncID,liked:!liked)) }
             else { personal.toggleLike(track.song.id) }
         }
-        Button("Играть следующим",systemImage:"text.line.first.and.arrowtriangle.forward") { Task { await player.enqueue(track.song,next:true,repository:library.repository) } }
-        Button("В конец очереди",systemImage:"text.append") { Task { await player.enqueue(track.song,next:false,repository:library.repository) } }
-        Menu("В плейлист",systemImage:"text.badge.plus") {
+        Button("PLAY NEXT",systemImage:"text.line.first.and.arrowtriangle.forward") { Task { await player.enqueue(track.song,next:true,repository:library.repository) } }
+        Button("ADD TO QUEUE",systemImage:"text.append") { Task { await player.enqueue(track.song,next:false,repository:library.repository) } }
+        Menu("ADD TO PLAYLIST",systemImage:"text.badge.plus") {
             ForEach(pc.collections.playlists) { playlist in Button(playlist.name) { pc.edit(PCEdit(kind:"add_tracks",playlist:playlist.id,tracks:[syncID])) } }
             if pc.collections.playlists.isEmpty { Text("Создай плейлист во вкладке «Создать»") }
         }
-        if let playlistID { Button("Убрать из плейлиста",systemImage:"minus.circle",role:.destructive) { pc.edit(PCEdit(kind:"remove_track",track:syncID,playlist:playlistID)) } }
-        if let remote = track.remote, track.local == nil { Button("Скачать оригинал",systemImage:"arrow.down.circle") { pc.download([remote],library:library) } }
+        if let playlistID { Button("REMOVE FROM PLAYLIST",systemImage:"minus.circle",role:.destructive) { pc.edit(PCEdit(kind:"remove_track",track:syncID,playlist:playlistID)) } }
+        if let remote = track.remote, track.local == nil { Button("DOWNLOAD ORIGINAL",systemImage:"arrow.down.circle") { pc.download([remote],library:library) } }
     }
     @ViewBuilder private var libraryActions: some View {
-        NavigationLink { MusicLibraryView(artist:track.song.artist).navigationTitle(track.song.artist) } label: { Label("К исполнителю",systemImage:"person") }
-        NavigationLink { MusicLibraryView(album:track.song.artist + " — " + track.song.album).navigationTitle(track.song.album) } label: { Label("К альбому",systemImage:"square.stack") }
+        NavigationLink { MusicLibraryView(artist:track.song.artist).navigationTitle(track.song.artist) } label: { Label("GO TO ARTIST",systemImage:"person") }
+        NavigationLink { MusicLibraryView(album:track.song.artist + " — " + track.song.album).navigationTitle(track.song.album) } label: { Label("GO TO ALBUM",systemImage:"square.stack") }
     }
     @ViewBuilder private var fileActions: some View {
-        Button("Поделиться оригиналом",systemImage:"square.and.arrow.up") { Task {
+        Button("SHARE ORIGINAL",systemImage:"square.and.arrow.up") { Task {
             do { let song = try await pc.resolve(track.song,library:library); sharing.payload = SharePayload(items:[try await library.repository.fileURL(song)]) }
             catch { player.error = "Не удалось открыть оригинал." }
         } }
-        NavigationLink { TrackInformation(track:track) } label: { Label("Сведения о файле",systemImage:"info.circle") }
-        Button("Код трека",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",syncID)) }
-        Button(HiddenTrackPolicy.ids(hidden).isDisjoint(with:track.aliases) ? "Скрыть из автоматической очереди" : "Показывать трек",systemImage:"eye.slash") { hidden = HiddenTrackPolicy.toggled(hidden,aliases:track.aliases) }
-        if let song = track.local { Button("Удалить копию с iPhone",systemImage:"trash",role:.destructive) { Task { await library.removeCopies([song]); player.forgetFiles([song.id]) } } }
+        NavigationLink { TrackInformation(track:track) } label: { Label("FILE INFO",systemImage:"info.circle") }
+        Button("TRACK CODE",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",syncID)) }
+        Button(HiddenTrackPolicy.ids(hidden).isDisjoint(with:track.aliases) ? "HIDE FROM QUEUE" : "SHOW TRACK",systemImage:"eye.slash") { hidden = HiddenTrackPolicy.toggled(hidden,aliases:track.aliases) }
+        if let song = track.local { Button("REMOVE PHONE COPY",systemImage:"trash",role:.destructive) { Task { await library.removeCopies([song]); player.forgetFiles([song.id]) } } }
     }
 }
 struct TrackInformation: View {
@@ -139,6 +140,6 @@ struct TrackInformation: View {
             LabeledContent("Формат",value:track.song.format)
             LabeledContent("Размер",value:ByteCountFormatter.string(fromByteCount:track.song.size,countStyle:.file))
             LabeledContent("Доступность",value:track.local == nil ? "На компьютере" : "На iPhone")
-        }.navigationTitle("Сведения о файле")
+        }.navigationTitle("FILE INFO")
     }
 }

@@ -109,6 +109,7 @@ final class PCConnection: ObservableObject {
     private var state = PCStoredState()
     private var initialized = false
     private var syncing = false
+    private var refreshInProgress = false
     private var stateSave: Task<Void, Error>?
     private let discovery = PCDiscovery()
     private var refreshTask: Task<Void, Never>?
@@ -140,12 +141,12 @@ final class PCConnection: ObservableObject {
     func activate() {
         guard let pairing, !UserDefaults.standard.bool(forKey: "offlineMode") else { return }
         discovery.start(fingerprint: pairing.fingerprint)
-        refreshTask?.cancel()
+        guard refreshTask == nil else { return }
         refreshTask = Task {
             await initialize()
             while !Task.isCancelled {
                 await refresh(quiet: true)
-                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+                do { try await Task.sleep(for: .seconds(90)) } catch { return }
             }
         }
     }
@@ -194,21 +195,23 @@ final class PCConnection: ObservableObject {
         return data
     }
     func refresh(quiet: Bool = false) async {
-        guard !refreshing else { return }
-        refreshing = true; let operation = generation
-        defer { refreshing = false }
+        guard !refreshInProgress else { return }
+        refreshInProgress = true; if !quiet { refreshing = true }; let operation = generation
+        defer { refreshInProgress = false; if refreshing { refreshing = false } }
         do {
             let bytes = try await data("/v1/library")
             guard bytes.count <= 32 * 1024 * 1024, operation == generation else { return }
             let catalog = try await Task.detached(priority: .userInitiated) { try PCStorage.decodeCatalog(bytes) }.value
-            _ = try await storage.catalog(bytes); await accept(catalog.tracks); online = true
+            if tracks != catalog.tracks { _ = try await storage.catalog(bytes); await accept(catalog.tracks) }; if !online { online = true }
             await syncCollections(quiet: quiet)
-        } catch { if operation == generation { online = false; if !quiet { self.error = error.localizedDescription } } }
+        } catch { if operation == generation { if online { online = false }; if !quiet { self.error = error.localizedDescription } } }
     }
     private func publishCollections() {
         var visible = state.collections
         for edit in state.pending { visible.apply(edit) }
-        collections = visible; likedIDs = Set(visible.likes); pendingCount = state.pending.count; collectionsRevision += 1
+        if collections != visible { collections = visible; collectionsRevision += 1 }
+        let likes = Set(visible.likes); if likedIDs != likes { likedIDs = likes }
+        if pendingCount != state.pending.count { pendingCount = state.pending.count }
     }
     private func persist() async throws {
         let snapshot = state, previous = stateSave
@@ -266,7 +269,7 @@ final class PCConnection: ObservableObject {
                 }
                 guard generation == operation else { return }
                 let acknowledged = Set(sending.map(\.id)); state.pending.removeAll { acknowledged.contains($0.id) }
-                state.collections = snapshot; publishCollections(); try await persist()
+                if state.collections != snapshot || !sending.isEmpty { state.collections = snapshot; publishCollections(); try await persist() }
             } while !SharedPlaylistMigration.ready(state.pending).isEmpty
         } catch {
             if (error as NSError).domain == "UndertoneSync", generation == operation {
@@ -276,6 +279,17 @@ final class PCConnection: ObservableObject {
                 self.error = "Некоторые изменения конфликтуют с библиотекой ПК. Открой «Синхронизация», чтобы отменить изменения удалённых треков или плейлистов."
             } else if !quiet { self.error = error.localizedDescription }
         }
+    }
+    func cacheLyrics(_ song: Song) async -> LyricsDocument? {
+        if let cached = try? await LyricsStorage.shared.read(song.id), !cached.plain.isEmpty || !cached.lines.isEmpty { return cached }
+        for id in song.sourceIDs.sorted() where id.count == 32 {
+            guard !Task.isCancelled else { return nil }
+            if let bytes = try? await data("/v1/lyrics/" + id), bytes.count <= 1024*1024,
+               let doc = try? JSONDecoder().decode(LyricsDocument.self,from:bytes), !doc.plain.isEmpty || !doc.lines.isEmpty {
+                try? await LyricsStorage.shared.save(doc,id:song.id); return doc
+            }
+        }
+        return nil
     }
     func disconnect() {
         playbackRequest = UUID(); pendingPlayback = nil

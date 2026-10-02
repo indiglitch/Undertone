@@ -20,6 +20,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var resumeAfterInterruption = false
     @Published private(set) var playbackQueue = PlaybackQueue()
     var upcoming: [Song] { playbackQueue.upcoming }
+    var shuffled: Bool { playbackQueue.shuffled }
     var repeatMode: RepeatMode { playbackQueue.mode }
     private var repository: LibraryRepository?
     private var timer: AnyCancellable?

@@ -17,7 +17,7 @@ final class SearchInteractionTests: XCTestCase {
         let done = app.buttons["dismissSearchKeyboard"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons.matching(identifier:"dismissSearchKeyboard").count,1)
-        XCTAssertFalse(app.navigationBars.buttons["Готово"].exists)
+        XCTAssertFalse(app.navigationBars.buttons["DONE"].exists)
         done.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         field.tap()
@@ -29,10 +29,10 @@ final class SearchInteractionTests: XCTestCase {
         let app = searchApp()
         app.textFields["musicSearchField"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        app.buttons["Альбомы"].tap()
+        app.buttons["ALBUMS"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         XCTAssertFalse(app.buttons["Сканировать код Undertone"].exists)
-        for title in ["Песни", "Альбомы", "Исполнители", "Плейлисты"] {
+        for title in ["SONGS", "ALBUMS", "ARTISTS", "PLAYLISTS"] {
             let button = app.buttons[title]
             XCTAssertTrue(button.isHittable)
             XCTAssertGreaterThanOrEqual(button.frame.minX, app.frame.minX)

@@ -87,7 +87,7 @@ struct RootView: View {
         }
         .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
         .sheet(isPresented:$creating) { CreateMusicView() }
-        .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("Компьютер").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { devicePresented = false } } } } }
+        .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("COMPUTER").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { devicePresented = false } } } } }
         .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
         .sheet(item:$routes.route) { MusicRouteView(route:$0) }
         .sheet(item:$routes.code) { MusicCodeView(url:$0.url) }
@@ -115,27 +115,28 @@ struct RootView: View {
 NavigationStack {
                         tabPage(item)
                         .navigationTitle(item.rawValue)
-                        .navigationBarTitleDisplayMode(item == .home ? .inline : .large)
+                        .navigationBarTitleDisplayMode(item == .home || item == .search ? .inline : .large)
                         .toolbar {
                             if item == .home {
                                 ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Синхронизировать", systemImage:"arrow.triangle.2.circlepath") {
+                                    Button("SYNC", systemImage:"arrow.triangle.2.circlepath") {
                                         if pc.address.isEmpty { devicePresented = true }
                                         else { Task { await pc.migratePlaylists(personal,library:library); await pc.refresh() } }
-                                    }.disabled(pc.refreshing).accessibilityIdentifier("syncLibrary")
-                                }
+                                    }.disabled(pc.refreshing).accessibilityIdentifier("syncLibrary").buttonStyle(PressFeedbackStyle())
+                                    .padding(.trailing, 12)
+                                }.sharedBackgroundVisibility(.hidden)
                                 ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Добавить файлы", systemImage: "plus") { importer = true }
+                                    Button("ADD FILES", systemImage: "plus") { importer = true }
                                         .disabled(library.importing || pc.downloading != nil)
-                                }
+                                }.sharedBackgroundVisibility(.hidden)
                             }
                         }
                         .toolbar {
                             if item == .home {
-                                ToolbarItem(placement:.topBarLeading) { Menu("Личная библиотека",systemImage:"person.crop.circle") {
-                                    NavigationLink { MobileSettingsView() } label: { Label("Настройки",systemImage:"gearshape") }
-                                    NavigationLink { RecentListeningView() } label: { Label("Недавно слушали",systemImage:"clock") }
-                                    Button("Компьютер",systemImage:"desktopcomputer") { devicePresented = true }
+                                ToolbarItem(placement:.topBarLeading) { Menu("PERSONAL LIBRARY",systemImage:"person.crop.circle") {
+                                    NavigationLink { MobileSettingsView() } label: { Label("SETTINGS",systemImage:"gearshape") }
+                                    NavigationLink { RecentListeningView() } label: { Label("RECENTLY PLAYED",systemImage:"clock") }
+                                    Button("COMPUTER",systemImage:"desktopcomputer") { devicePresented = true }
                                 } }
                             }
                         }
@@ -145,13 +146,13 @@ NavigationStack {
 Group {
                             if item == .library { LibraryHubView() }
                             else if item == .search { MobileSearchView() }
-                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Создать плейлист") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
+                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("CREATE PLAYLIST") { creating = true }.buttonStyle(.glassProminent); Button("IMPORT FILES") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
                             else {
                                 ScrollView {
                                     LazyVStack(alignment: .leading, spacing: 28) {
                                         home
                                     }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
-                                }.scrollContentBackground(.hidden)
+                                }.modifier(SoftScrollEdges()).scrollContentBackground(.hidden)
                             }
                         }
     }
@@ -164,17 +165,17 @@ Group {
                 Text("Оригинальное качество")
             }.font(.caption2).foregroundStyle(.secondary)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("Любимые треки") } label: { homeShortcut("Любимые треки",icon:"heart.fill") }
-                NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("Все треки") } label: { homeShortcut("Все треки",icon:"music.note") }
-                Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "Подключить ПК" : "Библиотека ПК",icon:"desktopcomputer") }
+                NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("LIKED TRACKS") } label: { homeShortcut("LIKED TRACKS",icon:"heart.fill") }
+                NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("ALL TRACKS") } label: { homeShortcut("ALL TRACKS",icon:"music.note") }
+                Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "CONNECT PC" : "PC LIBRARY",icon:"desktopcomputer") }
                 ForEach(pc.collections.playlists.prefix(2)) { playlist in
-                    SharedPlaylistLink(playlist:playlist).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
+                    SharedPlaylistLink(playlist:playlist).frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
                 }
-            }.buttonStyle(.plain)
+            }.buttonStyle(PressFeedbackStyle())
             if library.songs.isEmpty && pc.tracks.isEmpty {
                 emptyLibrary
             } else {
-                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "Недавно слушали", detail: "Твоя библиотека")
+                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "RECENTLY PLAYED", detail: "Твоя библиотека")
                 songList(homeTracks)
                 sectionHeading("Альбомы", detail: "\(Set(library.albums.keys).union(pc.albums.keys).count)")
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -227,10 +228,10 @@ Group {
                     }
                     Spacer(minLength: 0)
                 }.contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityLabel("Открыть плеер")
-            Button(player.playing ? "Пауза" : "Воспроизвести", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
+            }.buttonStyle(PressFeedbackStyle()).accessibilityLabel("OPEN PLAYER")
+            Button(player.playing ? "PAUSE" : "PLAY", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
-            Button("Следующий трек", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
+            Button("NEXT TRACK", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
             Menu { TrackContextMenu(track:UnifiedTrack(song)) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню " + song.title)
         }.padding(.horizontal, 12).padding(.vertical, 4)
@@ -267,16 +268,16 @@ struct PlayerView: View {
                             LocalVisualView()
                         }
                     }.padding(.horizontal, 24).padding(.bottom, 32).frame(maxWidth: .infinity)
-                }.scrollIndicators(.hidden)
+                }.modifier(SoftScrollEdges()).scrollIndicators(.hidden)
             }
             .background(Color.canvas)
             .navigationTitle("Сейчас играет").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Свернуть плеер", systemImage: "chevron.down") { dismiss() }.labelStyle(.iconOnly)
+                    Button("CLOSE PLAYER", systemImage: "chevron.down") { dismiss() }.labelStyle(.iconOnly)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu("Действия с треком", systemImage: "ellipsis") {
+                    Menu("TRACK ACTIONS", systemImage: "ellipsis") {
                         if let song = player.current { TrackContextMenu(track:UnifiedTrack(song)) }
                     }
                 }
@@ -294,7 +295,7 @@ struct PlayerView: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             if let song = player.current {
                 let liked = song.syncID.map { pc.likedIDs.contains($0) } ?? personal.state.likes.contains(song.id)
-                Button(liked ? "Убрать из любимых" : "В любимые", systemImage: liked ? "heart.fill" : "heart") {
+                Button(liked ? "UNLIKE" : "LIKE", systemImage: liked ? "heart.fill" : "heart") {
                     if let id = song.syncID { pc.edit(PCEdit(kind: "like", track: id, liked: !pc.likedIDs.contains(id))) }
                     else { personal.toggleLike(song.id) }
                 }.labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44).tint(liked ? .undertone : .primary)
@@ -313,17 +314,20 @@ struct PlayerView: View {
     }
     private var transport: some View {
         HStack(spacing: 0) {
-            playerButton("Перемешать следующие треки", icon: "shuffle") { player.shuffleUpcoming() }
-                .disabled(player.upcoming.count < 2)
+            playerButton("SHUFFLE UPCOMING", icon: "shuffle") { player.shuffleUpcoming() }
+                .disabled(player.upcoming.count < 2 && !player.shuffled)
+                .foregroundStyle(player.shuffled ? Color.undertone : .white)
+                .background(player.shuffled ? Color.undertone.opacity(0.18) : .clear,in:Circle())
+                .accessibilityValue(player.shuffled ? "ON" : "OFF")
             Spacer(minLength: 0)
-            playerButton("Предыдущий трек", icon: "backward.end.fill") { Task { await player.advance(-1) } }
+            playerButton("PREVIOUS TRACK", icon: "backward.end.fill") { Task { await player.advance(-1) } }
             Spacer(minLength: 0)
-            Button(player.playing ? "Пауза" : "Воспроизвести", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
+            Button(player.playing ? "PAUSE" : "PLAY", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
                 .labelStyle(.iconOnly).font(.system(size: 28, weight: .semibold))
                 .frame(width: 72, height: 72).background(Color.undertone, in: Circle()).foregroundStyle(.white)
-                .buttonStyle(.plain)
+                .buttonStyle(PressFeedbackStyle())
             Spacer(minLength: 0)
-            playerButton("Следующий трек", icon: "forward.end.fill") { Task { await player.advance(1) } }
+            playerButton("NEXT TRACK", icon: "forward.end.fill") { Task { await player.advance(1) } }
             Spacer(minLength: 0)
             playerButton(player.repeatMode.title, icon: player.repeatMode.icon) { player.cycleRepeat() }
                 .foregroundStyle(player.repeatMode == .off ? Color.primary : Color.undertone)
@@ -331,14 +335,14 @@ struct PlayerView: View {
     }
     private func playerButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).font(.system(size: 21, weight: .medium)).frame(width: 44, height: 44).contentShape(Rectangle()) }
-            .buttonStyle(.plain).accessibilityLabel(title)
+            .buttonStyle(PressFeedbackStyle()).accessibilityLabel(title)
     }
     private var secondaryActions: some View {
         HStack {
             Label("На iPhone", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             if let song = player.current { ShareOriginalButton(song: song).labelStyle(.iconOnly).frame(width: 44, height: 44) }
-            playerButton("Очередь", icon: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
+            playerButton("QUEUE", icon: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
         }
     }
 }

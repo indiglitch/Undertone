@@ -20,7 +20,7 @@ struct PlaylistEditorView: View {
         NavigationStack {
             List {
                 Section("Обложка на iPhone") {
-                    HStack { CoverArtwork(id:coverID,size:72).id(coverRevision); Button("Выбрать изображение") { coverImport = true } }
+                    HStack { CoverArtwork(id:coverID,size:72).id(coverRevision); Button("CHOOSE IMAGE") { coverImport = true } }
                 }
                 Section("Плейлист") { TextField("Название",text:$name); TextField("Описание",text:$description,axis:.vertical) }
                 Section("Треки · \(order.count)") {
@@ -33,10 +33,10 @@ struct PlaylistEditorView: View {
                     if order.isEmpty { Text("Добавь треки из меню песни").foregroundStyle(.secondary) }
                 }
             }.environment(\.editMode,.constant(.active))
-            .navigationTitle("Редактировать плейлист").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("EDIT PLAYLIST").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement:.topBarLeading) { Button("Отмена") { dismiss() } }
-                ToolbarItem(placement:.topBarTrailing) { Button("Сохранить") {
+                ToolbarItem(placement:.topBarLeading) { Button("CANCEL") { dismiss() } }
+                ToolbarItem(placement:.topBarTrailing) { Button("SAVE") {
                     if order != baseline { pc.edit(PCEdit(kind:"replace_tracks",playlist:id,tracks:order,expected_tracks:baseline)) }
                     pc.edit(PCEdit(kind:"rename_playlist",playlist:id,name:name.trimmingCharacters(in:.whitespacesAndNewlines)))
                     pc.edit(PCEdit(kind:"describe_playlist",playlist:id,description:description))

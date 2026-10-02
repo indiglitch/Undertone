@@ -23,13 +23,14 @@ struct UndertoneApp: App {
                 .environmentObject(sharing)
                 .environmentObject(routes)
                 .onOpenURL { url in routes.open(url) }
+                .buttonStyle(PressFeedbackStyle())
                 .preferredColorScheme(.dark)
                 .tint(.undertone)
                 .task {
                     #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--ui-fixture") { try? await NativeUITestFixture.prepare() }
                     #endif
-                    downloads.onInstall = { await library.load(); await pc.migratePlaylists(personal,library:library); await pc.syncCollections(quiet:true) }
+                    downloads.onInstall = { id in await library.load(); await pc.migratePlaylists(personal,library:library); await pc.syncCollections(quiet:true); if let song = library.songs.first(where: { $0.sourceIDs.contains(id) }) { _ = await pc.cacheLyrics(song) } }
                     await library.load(); await personal.load(); await pc.initialize()
                     player.onTrack = { personal.record($0.id) }
                     player.resolveSong = { [weak pc, weak library] song in guard let pc, let library else { throw PCError.disconnected }; return try await pc.resolve(song,library:library) }

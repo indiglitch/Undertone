@@ -16,15 +16,15 @@ struct LibraryHubView: View {
         List {
             Section {
                 HStack(spacing:6) { ForEach(["Всё","Плейлисты","Альбомы","Исполнители"],id: \.self) { name in
-                    Button(name) { filter = name }.font(.caption).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth:.infinity,minHeight:44)
-                        .background(filter == name ? Color.undertone.opacity(0.25) : .white.opacity(0.06),in:Capsule()).buttonStyle(.plain)
+                    Button(["Всё":"ALL","Песни":"SONGS","Альбомы":"ALBUMS","Исполнители":"ARTISTS","Плейлисты":"PLAYLISTS"][name] ?? name) { filter = name }.font(.caption).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth:.infinity,minHeight:44)
+                        .background(filter == name ? Color.undertone.opacity(0.25) : .white.opacity(0.06),in:Capsule()).buttonStyle(PressFeedbackStyle())
                 } }
-                NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("Все треки") } label: { Label("Все треки",systemImage:"music.note") }
-                NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("Любимые треки") } label: { Label("Любимые треки",systemImage:"heart") }
+                NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("ALL TRACKS") } label: { Label("ALL TRACKS",systemImage:"music.note") }
+                NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("LIKED TRACKS") } label: { Label("LIKED TRACKS",systemImage:"heart") }
             }
             if filter == "Всё" || filter == "Плейлисты" { Section("Плейлисты") {
                 ForEach(playlists) { SharedPlaylistLink(playlist:$0) }
-                Button("Создать плейлист",systemImage:"plus") { creating = true }
+                Button("CREATE PLAYLIST",systemImage:"plus") { creating = true }
             } }
             if filter == "Всё" || filter == "Альбомы" { Section("Сохранённые альбомы") {
                 ForEach(personal.state.albums.filter(matches).sorted(),id:\.self) { SharedAlbumLink(name:$0) }
@@ -33,7 +33,7 @@ struct LibraryHubView: View {
             if filter == "Всё" || filter == "Исполнители" { Section("Исполнители") {
                 ForEach(personal.state.artists.filter(matches).sorted(),id:\.self) { name in NavigationLink { MusicLibraryView(artist:name).navigationTitle(name) } label: { Label(name,systemImage:"person") } }
             } }
-        }.listStyle(.plain).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
+        }.listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
             .searchable(text:$query,prompt:"Поиск в библиотеке")
             .sheet(isPresented:$creating) { CreateMusicView() }
     }
@@ -47,12 +47,12 @@ struct CreateMusicView: View {
             Form {
                 TextField("Название",text:$name)
                 Text("Единый плейлист для iPhone и ПК. Изменения сохраняются офлайн и синхронизируются при подключении.").font(.caption).foregroundStyle(.secondary)
-                Button("Создать плейлист") {
+                Button("CREATE PLAYLIST") {
                     pc.edit(PCEdit(kind:"create_playlist",playlist:UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),name:name.trimmingCharacters(in:.whitespacesAndNewlines)))
                     dismiss()
                 }.disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || name.count > 120)
             }.navigationTitle("Новый плейлист").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { dismiss() } } }
+                .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } }
         }.presentationDetents([.medium])
     }
 }
@@ -68,18 +68,18 @@ struct MobileSearchView: View {
     private var artists: [String] { Set(pc.tracks.map(\.artist)).union(library.songs.map(\.artist)).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
     var body: some View {
         VStack(spacing: 0) {
-            HStack { Image(systemName: "magnifyingglass"); TextField("Песня, альбом, исполнитель", text: $query).accessibilityIdentifier("musicSearchField").focused($searchFocused).submitLabel(.search).onSubmit { personal.rememberSearch(query); searchFocused = false }; if !query.isEmpty { Button("Очистить", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly) } }.padding(12).background(.white.opacity(0.06),in: RoundedRectangle(cornerRadius: 14)).padding(.horizontal)
+            HStack { Image(systemName: "magnifyingglass"); TextField("Песня, альбом, исполнитель", text: $query).accessibilityIdentifier("musicSearchField").focused($searchFocused).submitLabel(.search).onSubmit { personal.rememberSearch(query); searchFocused = false }; if !query.isEmpty { Button("CLEAR", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly) } }.padding(12).background(.white.opacity(0.06),in: RoundedRectangle(cornerRadius: 14)).padding(.horizontal)
             HStack(spacing: 6) {
                 ForEach(["Песни", "Альбомы", "Исполнители", "Плейлисты"], id: \.self) { name in
                     Button { searchFocused = false; filter = name } label: {
-                        Text(name).font(.caption.weight(.medium)).lineLimit(1).minimumScaleFactor(0.85)
+                        Text(["Песни":"SONGS","Альбомы":"ALBUMS","Исполнители":"ARTISTS","Плейлисты":"PLAYLISTS","Все":"ALL" ][name] ?? name).font(.caption.weight(.medium)).lineLimit(1).minimumScaleFactor(0.85)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .background(filter == name ? Color.undertone.opacity(0.25) : .white.opacity(0.06), in: Capsule())
-                    }.buttonStyle(.plain).accessibilityAddTraits(filter == name ? .isSelected : [])
+                    }.buttonStyle(PressFeedbackStyle()).accessibilityAddTraits(filter == name ? .isSelected : [])
                 }
             }.padding(.horizontal, 16).padding(.vertical, 12)
             if query.isEmpty && !personal.state.searches.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(personal.state.searches, id: \.self) { text in Button(text) { query = text }.font(.caption).buttonStyle(.bordered) }; Button("Очистить историю") { personal.update { $0.searches = [] } } }.padding(.horizontal) }
+                ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(personal.state.searches, id: \.self) { text in Button(text) { query = text }.font(.caption).buttonStyle(.bordered) }; Button("CLEAR HISTORY") { personal.update { $0.searches = [] } } }.padding(.horizontal) }
             }
             if filter == "Песни" { MusicLibraryView(showRoot: false, externalQuery: query) }
             else {
@@ -89,7 +89,7 @@ struct MobileSearchView: View {
                     if filter == "Плейлисты" {
                         ForEach(pc.collections.playlists.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }) { SharedPlaylistLink(playlist:$0) }
                     }
-                }.listStyle(.plain).scrollContentBackground(.hidden)
+                }.listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden)
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -97,7 +97,7 @@ struct MobileSearchView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Готово") { personal.rememberSearch(query); searchFocused = false }.buttonStyle(.borderedProminent).controlSize(.small).tint(.undertone).padding(.bottom,6).accessibilityIdentifier("dismissSearchKeyboard")
+                Button("DONE") { personal.rememberSearch(query); searchFocused = false }.buttonStyle(.borderedProminent).controlSize(.small).tint(.undertone).padding(.bottom,6).accessibilityIdentifier("dismissSearchKeyboard")
             }
         }
     }
@@ -105,11 +105,11 @@ struct MobileSearchView: View {
 
 struct RecentListeningView: View {
     @EnvironmentObject private var personal: PersonalLibrary
-    var body: some View { MusicLibraryView(downloadsOnly: true, orderedIDs: personal.state.recents, showRoot: false).navigationTitle("Недавно слушали") }
+    var body: some View { MusicLibraryView(downloadsOnly: true, orderedIDs: personal.state.recents, showRoot: false).navigationTitle("RECENTLY PLAYED") }
 }
 
 private struct LibraryPinSwipe: ViewModifier {
     @EnvironmentObject private var personal: PersonalLibrary
     let id: String
-    func body(content: Content) -> some View { content.swipeActions(edge:.leading) { Button { personal.togglePin(id) } label: { Label(personal.state.pins.contains(id) ? "Открепить" : "Закрепить",systemImage:"pin") }.tint(.undertone) } }
+    func body(content: Content) -> some View { content.swipeActions(edge:.leading) { Button { personal.togglePin(id) } label: { Label(personal.state.pins.contains(id) ? "UNPIN" : "PIN",systemImage:"pin") }.tint(.undertone) } }
 }

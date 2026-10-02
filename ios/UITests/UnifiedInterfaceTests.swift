@@ -12,7 +12,7 @@ final class UnifiedInterfaceTests: XCTestCase {
         let app = fixture()
         let menu = app.buttons["Меню Midnight city"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout:10)); menu.tap()
-        for title in ["Играть следующим","В конец очереди","В плейлист"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout:3)) }
+        for title in ["PLAY NEXT","ADD TO QUEUE","ADD TO PLAYLIST"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout:3)) }
     }
     func testRemoteTapShowsShortNonblockingErrorAndOneTrackList() {
         let app = fixture("search")
@@ -27,13 +27,13 @@ final class UnifiedInterfaceTests: XCTestCase {
         let app = fixture("search")
         let menu = app.buttons["Меню Midnight city"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout:10)); menu.tap()
-        for title in ["Играть следующим","В конец очереди","В плейлист"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout:3)) }
+        for title in ["PLAY NEXT","ADD TO QUEUE","ADD TO PLAYLIST"] { XCTAssertTrue(app.buttons[title].waitForExistence(timeout:3)) }
     }
     func testMigratedPlaylistHasContextMenuAndNoFolderCreation() {
         let app = fixture()
         let menu = app.buttons["Меню Вечером"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout:10)); menu.tap()
-        XCTAssertTrue(app.buttons["Редактировать плейлист"].waitForExistence(timeout:3))
+        XCTAssertTrue(app.buttons["EDIT PLAYLIST"].waitForExistence(timeout:3))
         XCTAssertFalse(app.buttons["В папку"].exists)
     }
 }

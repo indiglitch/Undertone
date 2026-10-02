@@ -1,7 +1,7 @@
 import Foundation
 
 enum RepeatMode: String, CaseIterable { case off, all, one
-    var title: String { switch self { case .off: return "Без повтора"; case .all: return "Повтор очереди"; case .one: return "Повтор трека" } }
+    var title: String { switch self { case .off: return "REPEAT OFF"; case .all: return "REPEAT ALL"; case .one: return "REPEAT ONE" } }
     var icon: String { self == .one ? "repeat.1" : "repeat" }
 }
 
@@ -9,9 +9,12 @@ struct PlaybackQueue {
     private(set) var songs: [Song] = []
     private(set) var index: Int = 0
     var mode: RepeatMode = .off
+    private(set) var shuffled = false
+    private var unshuffledIDs: [String] = []
     var current: Song? { songs.indices.contains(index) ? songs[index] : nil }
     var upcoming: [Song] { Array(songs.dropFirst(index + 1)) }
     mutating func replace(_ source: [Song], selected: Song) {
+        shuffled = false; unshuffledIDs = []
         var seen = Set<String>()
         songs = source.filter { seen.insert($0.id).inserted }
         if !songs.contains(where: { $0.id == selected.id }) { songs.insert(selected, at: 0) }
@@ -20,6 +23,7 @@ struct PlaybackQueue {
     mutating func materialize(_ id: String, with song: Song) {
         guard let position = songs.firstIndex(where: { $0.id == id }) else { return }
         songs[position] = song
+        unshuffledIDs = unshuffledIDs.map { $0 == id ? song.id : $0 }
         // Preserve index, history, repeat mode and future items when a remote original arrives.
     }
     mutating func enqueue(_ song: Song, next: Bool) {
@@ -64,7 +68,14 @@ struct PlaybackQueue {
         songs.removeAll { ids.contains($0.id) }
         index = retainedCurrent.flatMap { id in songs.firstIndex { $0.id == id } } ?? min(preceding, max(0, songs.count - 1))
     }
-    mutating func shuffleUpcoming() { songs = Array(songs.prefix(index + 1)) + upcoming.shuffled() }
+    mutating func shuffleUpcoming() {
+        if shuffled {
+            let positions = Dictionary(unshuffledIDs.enumerated().map { ($0.element,$0.offset) },uniquingKeysWith:{ a,_ in a })
+            let restored = upcoming.enumerated().sorted { (positions[$0.element.id] ?? (unshuffledIDs.count+$0.offset)) < (positions[$1.element.id] ?? (unshuffledIDs.count+$1.offset)) }.map(\.element)
+            songs = Array(songs.prefix(index+1)) + restored
+            shuffled = false; unshuffledIDs = []
+        } else { unshuffledIDs = songs.map(\.id); songs = Array(songs.prefix(index+1)) + upcoming.shuffled(); shuffled = true }
+    }
 }
 
 enum LibrarySort: String, CaseIterable, Identifiable, Sendable {

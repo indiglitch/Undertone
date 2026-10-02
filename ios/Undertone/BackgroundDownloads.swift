@@ -76,7 +76,7 @@ final class BackgroundDownloads: ObservableObject {
     @Published private(set) var completed = 0
     private(set) var canceledIDs = Set<String>()
     @Published var error: String?
-    var onInstall: (() async -> Void)?
+    var onInstall: ((String) async -> Void)?
     var backgroundCompletion: (() -> Void)?
     private let persistence: DownloadPersistence
     private let repository: LibraryRepository
@@ -175,7 +175,7 @@ final class BackgroundDownloads: ObservableObject {
             try await repository.installDownload(file, track: record.track, expectedHash: hash)
             try await persistence.setResume(record.id, data: nil)
             records.removeAll { $0.id == record.id }; completed += 1; await save()
-            await onInstall?()
+            await onInstall?(record.id)
             await CoverStore.shared.fetchPC(record.track)
         } catch {
             if let index = records.firstIndex(where: { $0.id == record.id }) { records[index].state = "failed"; records[index].taskID = nil }
