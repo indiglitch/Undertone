@@ -41,6 +41,18 @@ enum MobileTab: String, CaseIterable {
     var icon: String { switch self { case .home: return "house"; case .search: return "magnifyingglass"; case .library: return "square.stack"; case .create: return "plus" } }
 }
 
+private struct CompactPlayerAccessory<Accessory: View>: ViewModifier {
+    let enabled: Bool
+    let accessory: Accessory
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26.1, *) {
+            content.tabViewBottomAccessory(isEnabled: enabled) { accessory }
+        } else {
+            content.tabViewBottomAccessory { if enabled { accessory } }
+        }
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: MusicPlayer
@@ -98,9 +110,9 @@ struct RootView: View {
                     .tabItem { Label(item.rawValue, systemImage: item.icon) }.tag(item)
                 }
             }
-            .tabViewBottomAccessory(isEnabled: player.current != nil) {
+            .modifier(CompactPlayerAccessory(enabled: player.current != nil, accessory: Group {
                 if let song = player.current { miniPlayer(song) }
-            }
+            }))
         }
         .background { DownloadErrorAlerts() }
         .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
