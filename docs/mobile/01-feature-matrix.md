@@ -1,4 +1,4 @@
-# Mobile specification coverage — Undertone 0.5
+# Mobile specification coverage — Undertone 0.6
 
 Source: user-supplied Spotify Mobile music-only specification dated 2026-10-02. User decision: personal player; social features excluded. Functional adaptation, not a pixel-perfect Spotify clone.
 
@@ -9,8 +9,8 @@ Source: user-supplied Spotify Mobile music-only specification dated 2026-10-02. 
 | 5–6 player | Mini/full player, seek/transport/favorite/queue, lyrics/video/sharing, originals | No recommendation autoplay |
 | 7 gestures | Queue reorder/delete, library pin swipe, context menus | Leading song swipe adds next in queue |
 | 8 actions | Queue next/end, favorites, playlists, entity navigation, file info, original export, QR, phone-copy removal | No invented credits/explicit flags/radio |
-| 9 library | Bookmarks/favorites, personal/PC playlists, folders, pins, downloads/local files, search/sort | Grid applies to saved albums; unified entity grid remains |
-| 10 folders | Create/nest/move/rename/delete, cycle protection, preserve playlists when deleting folder | Device-local, including placement of PC playlists |
+| 9 library | Bookmarks/favorites, unified PC/iPhone playlists, pins, mixed downloaded/remote tracks, search/sort | Grid applies to saved albums; unified entity grid remains |
+| 10 folders | Removed by the user's updated requirements | Legacy fields decoded only for compatibility |
 | 11 playlist | Header/description/play/shuffle/download, add/remove/reorder, bulk actions, copy, imported cover | PC order edits check baseline; whole-playlist deletion undo remains |
 | 12 visibility | All playlists personal | Public/collaborative excluded |
 | 13 cover | Real image import using Files | Crop/stickers/text/composition remain; cover device-local |
@@ -35,11 +35,11 @@ Source: user-supplied Spotify Mobile music-only specification dated 2026-10-02. 
 | 36 share | OS share, originals, Undertone links/QR | Only object identity, never bearer token; recipient needs object in own library |
 | 37–39 chats/updates/push | Social functions excluded | In-app local download status; notifications remain |
 | 40 external | Background audio, Now Playing art/metadata/commands | WidgetKit remains; Android excluded |
-| 41 actions | Actual song/album/artist/playlist/folder entities | No profiles/other-user playlists |
+| 41 actions | Common song menus on Home/Search/collections/queue/player; album and playlist menus | No profiles/other-user playlists or folders |
 | 42 dialogs | Create/import, phone-copy delete/undo, trash/history confirmation, sync conflicts | Whole-playlist deletion undo remains |
-| 43 errors | Network/pairing/catalog/download/playback/import/lyrics/video errors and empties | Device permission/interruption checks deferred |
+| 43 errors | Short nonblocking error popup; network/pairing/catalog/download/playback/import/lyrics/video errors and empties | Device permission/interruption checks deferred |
 | 44–45 platform | Personal iOS player, standard share/Files/permissions | Free/Premium/Android distinctions inapplicable |
-| 46–47 persistence | Atomic library/personal/player data, durable sync/download queues, Keychain/DPAPI | Personal folders/bookmarks/history/playlists device-local; player restores paused; latest removal undo current-session only |
+| 46–47 persistence | Atomic library/personal/player data, durable shared-playlist offline operations and legacy migration, sync/download queues, Keychain/DPAPI | Bookmarks/history remain device-local; phone-only originals need a PC identity before their playlist edits synchronize; player restores paused |
 | 48 exclusions | No podcasts/audiobooks/service-only content | Preserved |
 | 49 visual audit | Undertone adaptation, native/browser checks | Not a pixel-perfect Spotify clone; physical accessibility checks pending |
 | 50 docs | Scope, matrix, report, device checklist | This matrix records outstanding requirements |

@@ -1,8 +1,12 @@
 # Undertone for iPhone — native companion
 
-## Version 0.5 — personal-player specification adaptation
+## Version 0.6 — unified personal library
 
-Home/Search/Library/optional Create; private playlists/nested folders/pins/bookmarks; playlist order/description editing with PC conflict detection; bulk phone-copy removal/undo; private links/QR and original export; cached/imported synchronized lyrics; user-provided video; explicit offline mode; persisted paused player restoration and system-decoder crossfade. Coverage and remaining requirements: `docs/mobile/01-feature-matrix.md`. Social/accounts excluded by user. Browser preview is a separate demo counterpart, not an iOS emulator.
+Home/Search/Library/optional Create; shared PC/iPhone playlists with durable offline edits, pins/bookmarks; playlist order/description editing with PC conflict detection; bulk phone-copy removal/undo; private links/QR and original export; cached/imported synchronized lyrics; user-provided video; explicit offline mode; persisted paused player restoration and system-decoder crossfade. Folders are removed. Coverage and remaining requirements: `docs/mobile/01-feature-matrix.md`. Social/accounts excluded by user. Browser preview is a separate demo counterpart, not an iOS emulator.
+
+Tracks share one context menu and row across Home, Search, collections and queue. Downloaded and remote tracks appear together; tapping a remote track downloads and verifies the original before playback, including when advancing through the queue. Current track and download status are visible. Errors use a short nonblocking popup. Home provides synchronization; Search has one Done action above the keyboard.
+
+Existing phone-only playlists migrate into the shared playlist model, preserving order and description. Offline changes are persisted before legacy playlists are retired. A phone-imported original without a known PC identity remains pending until the same original exists in the PC catalog; uploading phone originals to the PC is not implemented.
 
 Native SwiftUI client, deployment target iOS 26+. Uses the system Liquid Glass APIs rather than a web/CSS imitation. The requested iOS 27.0.1 device must be tested separately; no device compatibility result is implied by the deployment target.
 
