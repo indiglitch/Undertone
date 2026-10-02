@@ -71,11 +71,12 @@ struct RootView: View {
                                 ScrollView {
                                     LazyVStack(alignment: .leading, spacing: 28) {
                                         home
-                                    }.padding(.horizontal, 22).padding(.top, 12).padding(.bottom, 28)
+                                    }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 20)
                                 }.scrollContentBackground(.hidden)
                             }
                         }
                         .navigationTitle(item.rawValue)
+                        .navigationBarTitleDisplayMode(item == .home ? .inline : .large)
                         .toolbar {
                             if item == .home {
                                 ToolbarItem(placement: .topBarTrailing) {
@@ -93,12 +94,12 @@ struct RootView: View {
                                 } }
                             }
                         }
-                        .safeAreaInset(edge: .bottom, spacing: 12) {
-                            if let song = player.current { miniPlayer(song).padding(.horizontal, 16).padding(.bottom, 8) }
-                        }
                     }
                     .tabItem { Label(item.rawValue, systemImage: item.icon) }.tag(item)
                 }
+            }
+            .tabViewBottomAccessory(isEnabled: player.current != nil) {
+                if let song = player.current { miniPlayer(song) }
             }
         }
         .background { DownloadErrorAlerts() }
@@ -124,25 +125,21 @@ struct RootView: View {
     }
 
     private var home: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack { Label("UNDERTONE", systemImage: "waveform").font(.caption.weight(.semibold)).tracking(2); Spacer(); Image(systemName: "sparkle").foregroundStyle(Color.undertone) }
-                Text("Твоя музыка.\nВсегда рядом.").font(.system(.largeTitle, design: .rounded).bold()).tracking(-1)
-                Text("Оригинальные файлы. Твоя библиотека.\nБез интернета, когда музыка уже на iPhone.")
-                    .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Button { devicePresented = true } label: {
-                    Label(pc.address.isEmpty ? "Подключить компьютер" : "Библиотека компьютера", systemImage:"desktopcomputer")
-                        .font(.subheadline.weight(.semibold)).frame(minHeight: 44).padding(.horizontal, 12)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("\(library.songs.count) треков на iPhone")
+                Spacer(minLength: 4)
+                Text("Оригинальное качество")
+            }.font(.caption2).foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("Любимые треки") } label: { homeShortcut("Любимые треки",icon:"heart.fill") }
+                NavigationLink { MusicLibraryView(downloadsOnly:true,showRoot:false).navigationTitle("На iPhone") } label: { homeShortcut("Скачанное",icon:"arrow.down.circle.fill") }
+                NavigationLink { MusicLibraryView(localFiles:true,showRoot:false).navigationTitle("Локальные файлы") } label: { homeShortcut("Локальные файлы",icon:"music.note") }
+                Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "Подключить ПК" : "Библиотека ПК",icon:"desktopcomputer") }
+                ForEach(personal.state.playlists.prefix(2)) { playlist in
+                    NavigationLink { PersonalPlaylistView(id:playlist.id) } label: { homeShortcut(playlist.name,icon:"music.note.list") }
                 }
-                .buttonStyle(.glassProminent).disabled(library.importing || pc.downloading != nil)
-            }
-            .padding(24)
-            .background(LinearGradient(colors: [.undertone.opacity(0.20), .white.opacity(0.035)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 32))
-
-            HStack(spacing: 12) {
-                stat("На iPhone", value: "\(library.songs.count)", icon: "music.note")
-                stat("Оригиналы", value: ByteCountFormatter.string(fromByteCount: library.bytes, countStyle: .file), icon: "externaldrive")
-            }
+            }.buttonStyle(.plain)
             if library.songs.isEmpty {
                 emptyLibrary
             } else {
@@ -150,32 +147,22 @@ struct RootView: View {
                 songList(personal.state.recents.isEmpty ? library.recentSongs : Array(personal.state.recents.compactMap { id in library.songs.first(where:{$0.id == id}) }.prefix(8)))
                 sectionHeading("Альбомы", detail: "\(library.albums.count)")
                 ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 18) {
+                    LazyHStack(alignment: .top, spacing: 12) {
                         ForEach(library.albums.keys.sorted(), id: \.self) { key in
                             if let songs = library.albums[key], let first = songs.first {
                                 NavigationLink { MusicLibraryView(album:key).navigationTitle(first.album) } label: {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        CoverArtwork(id: first.syncID ?? first.id, size: 144)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        CoverArtwork(id: first.syncID ?? first.id, size: 116)
                                         Text(first.album).font(.subheadline.weight(.semibold)).lineLimit(2)
                                         Text(first.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                    }.frame(width: 144, alignment: .leading)
+                                    }.frame(width: 116, alignment: .leading)
                                 }.buttonStyle(.plain)
                             }
                         }
                     }
                 }
             }
-            Button { devicePresented = true } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: "desktopcomputer").font(.title2).foregroundStyle(Color.undertone)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Библиотека с компьютера").font(.subheadline.weight(.semibold))
-                        Text(pc.address.isEmpty ? "Подключить по Wi-Fi" : "\(pc.tracks.count) треков на ПК").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                }.padding(20).modifier(GlassSurface())
-            }.buttonStyle(.plain)
+
         }
     }
 
@@ -187,23 +174,23 @@ struct RootView: View {
         }.padding(.vertical, 6)
     }
 
-    private func stat(_ title: String, value: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: icon).foregroundStyle(Color.undertone)
-            Text(value).font(.title2.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-            Text(title).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
-            .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 24))
+    private func homeShortcut(_ title: String, icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName:icon).font(.title3).foregroundStyle(Color.undertone).frame(width:28)
+            Text(title).font(.subheadline.weight(.semibold)).lineLimit(2)
+            Spacer(minLength:0)
+        }.frame(maxWidth:.infinity,alignment:.leading).frame(minHeight:44).padding(8)
+            .background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
     }
     private func sectionHeading(_ title: String, detail: String) -> some View {
-        HStack { Text(title).font(.title2.bold()); Spacer(); Text(detail).font(.caption).foregroundStyle(.secondary) }
+        HStack { Text(title).font(.title3.bold()); Spacer(); Text(detail).font(.caption).foregroundStyle(.secondary) }
     }
     private func songList(_ songs: [Song]) -> some View {
-        LazyVStack(spacing: 8) {
+        LazyVStack(spacing: 4) {
             ForEach(songs) { song in
                 Button { start(song, queue: songs) } label: {
                     HStack(spacing: 13) {
-                        CoverArtwork(id: song.syncID ?? song.id, size: 52)
+                        CoverArtwork(id: song.syncID ?? song.id, size: 44)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                             Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -226,7 +213,7 @@ struct RootView: View {
         HStack(spacing: 12) {
             Button { expandedPlayer = true } label: {
                 HStack(spacing: 12) {
-                    CoverArtwork(id: song.syncID ?? song.id, size: 44)
+                    CoverArtwork(id: song.syncID ?? song.id, size: 36)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                         Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -238,7 +225,7 @@ struct RootView: View {
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
             Button("Следующий трек", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
-        }.padding(12).modifier(GlassSurface())
+        }.padding(.horizontal, 12).padding(.vertical, 4)
     }
 }
 
