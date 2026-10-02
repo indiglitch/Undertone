@@ -109,6 +109,7 @@ final class PCConnection: ObservableObject {
     private var state = PCStoredState()
     private var initialized = false
     private var syncing = false
+    private var stateSave: Task<Void, Error>?
     private let discovery = PCDiscovery()
     private var refreshTask: Task<Void, Never>?
     var downloading: String? { BackgroundDownloads.shared.title }
@@ -209,24 +210,45 @@ final class PCConnection: ObservableObject {
         for edit in state.pending { visible.apply(edit) }
         collections = visible; likedIDs = Set(visible.likes); pendingCount = state.pending.count; collectionsRevision += 1
     }
+    private func persist() async throws {
+        let snapshot = state, previous = stateSave
+        let next = Task { _ = try? await previous?.value; try await storage.save(snapshot) }
+        stateSave = next
+        try await next.value
+    }
+    func migratePlaylists(_ personal: PersonalLibrary, library: LibraryStore) async {
+        let legacy = personal.state.playlists
+        state.pending = SharedPlaylistMigration.remap(state.pending,songs:library.songs)
+        state.pending += SharedPlaylistMigration.plan(legacy,songs:library.songs,visible:collections)
+        publishCollections()
+        do {
+            try await persist()
+            if !legacy.isEmpty { personal.update { value in
+                value.playlists.removeAll { item in legacy.contains { $0.id == item.id } }
+                value.folders = []; value.playlistFolders = [:]; value.pins = Set(value.pins.filter { !$0.hasPrefix("folder:") })
+                for playlist in legacy { if value.pins.remove(playlist.id) != nil { value.pins.insert(playlist.id.replacingOccurrences(of:"-",with:"").lowercased()) } }
+            } }
+        } catch { self.error = "Не удалось сохранить плейлисты. Попробуй синхронизацию снова." }
+    }
     func edit(_ edit: PCEdit) {
+        if edit.kind == "delete_playlist" { state.pending.removeAll { $0.playlist == edit.playlist } }
         state.pending.append(edit); publishCollections()
         Task {
-            do { try await storage.save(state); await syncCollections(quiet: true) }
+            do { try await persist(); await syncCollections(quiet: true) }
             catch { self.error = error.localizedDescription }
         }
     }
     func discardEdit(_ id: String) {
         guard !syncing else { return }
         state.pending.removeAll { $0.id == id }; publishCollections()
-        Task { do { try await storage.save(state); await syncCollections() } catch { self.error = error.localizedDescription } }
+        Task { do { try await persist(); await syncCollections() } catch { self.error = error.localizedDescription } }
     }
     func syncCollections(quiet: Bool = false) async {
         guard !syncing, let session, !UserDefaults.standard.bool(forKey: "offlineMode") else { return }; syncing = true; defer { syncing = false }
         let operation = generation
         do {
             repeat {
-                let sending = Array(state.pending.prefix(500))
+                let sending = SharedPlaylistMigration.ready(state.pending)
                 let snapshot: PCCollections
                 if sending.isEmpty {
                     let bytes = try await data("/v1/collections")
@@ -244,12 +266,12 @@ final class PCConnection: ObservableObject {
                 }
                 guard generation == operation else { return }
                 let acknowledged = Set(sending.map(\.id)); state.pending.removeAll { acknowledged.contains($0.id) }
-                state.collections = snapshot; publishCollections(); try await storage.save(state)
-            } while !state.pending.isEmpty
+                state.collections = snapshot; publishCollections(); try await persist()
+            } while !SharedPlaylistMigration.ready(state.pending).isEmpty
         } catch {
             if (error as NSError).domain == "UndertoneSync", generation == operation {
                 if let data = try? await data("/v1/collections"), let snapshot = try? JSONDecoder().decode(PCCollections.self, from: data) {
-                    state.collections = snapshot; publishCollections(); try? await storage.save(state)
+                    state.collections = snapshot; publishCollections(); try? await persist()
                 }
                 self.error = "Некоторые изменения конфликтуют с библиотекой ПК. Открой «Синхронизация», чтобы отменить изменения удалённых треков или плейлистов."
             } else if !quiet { self.error = error.localizedDescription }
@@ -262,19 +284,30 @@ final class PCConnection: ObservableObject {
         state = PCStoredState(); publishCollections()
         Task { await BackgroundDownloads.shared.cancelAll(); try? await storage.clear() }
     }
-    func playRemote(_ track: PCTrack, library: LibraryStore, player: MusicPlayer) async {
-        if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { await player.play(song,queue:library.sortedSongs,repository:library.repository); return }
-        guard !UserDefaults.standard.bool(forKey:"offlineMode") else { error = "Этот трек ещё не скачан на iPhone."; return }
-        let request = UUID(); playbackRequest = request; pendingPlayback = track.id; player.pause()
-        defer { if playbackRequest == request { pendingPlayback = nil } }
-        await BackgroundDownloads.shared.prioritize(track,installed:library.installedIDs)
-        for _ in 0..<1800 {
-            guard playbackRequest == request,!Task.isCancelled,!BackgroundDownloads.shared.canceledIDs.contains(track.id) else { return }
-            if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { await player.play(song,queue:library.sortedSongs,repository:library.repository); return }
-            if BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "failed" || BackgroundDownloads.shared.records.first(where: { $0.id == track.id })?.state == "paused" { error = BackgroundDownloads.shared.error ?? "Не удалось скачать трек."; return }
-            do { try await Task.sleep(for:.milliseconds(100)) } catch { return }
+    func resolve(_ requested: Song, library: LibraryStore) async throws -> Song {
+        if let installed = library.songs.first(where: { $0.id == requested.id || !$0.sourceIDs.isDisjoint(with: requested.sourceIDs) }) { return installed }
+        if !requested.filename.isEmpty { return requested }
+        guard !UserDefaults.standard.bool(forKey: "offlineMode"), !address.isEmpty,
+              let track = tracks.first(where: { $0.id == requested.syncID || $0.id == requested.id }) else {
+            throw NSError(domain: "Playback", code: 1, userInfo: [NSLocalizedDescriptionKey:"Трек не скачан. Подключи ПК по Wi-Fi."])
         }
-        error = "Трек ещё загружается. Он будет доступен в библиотеке после завершения."
+        let request = UUID(); playbackRequest = request; pendingPlayback = track.id
+        defer { if playbackRequest == request { pendingPlayback = nil } }
+        await BackgroundDownloads.shared.prioritize(track, installed: library.installedIDs)
+        for _ in 0..<1800 {
+            guard playbackRequest == request, !Task.isCancelled, !BackgroundDownloads.shared.canceledIDs.contains(track.id) else { throw CancellationError() }
+            if let song = library.songs.first(where: { $0.sourceIDs.contains(track.id) }) { return song }
+            if let record = BackgroundDownloads.shared.records.first(where: { $0.id == track.id }), ["failed","paused"].contains(record.state) {
+                throw NSError(domain:"Playback",code:2,userInfo:[NSLocalizedDescriptionKey: "Не удалось скачать трек. Проверь связь с ПК."])
+            }
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        throw NSError(domain:"Playback",code:3,userInfo:[NSLocalizedDescriptionKey:"Загрузка ещё идёт. Попробуй позже."])
+    }
+    func playRemote(_ track: PCTrack, library: LibraryStore, player: MusicPlayer) async {
+        player.resolveSong = { [weak self, weak library] song in guard let self, let library else { throw PCError.disconnected }; return try await self.resolve(song, library: library) }
+        let entries = TrackCatalog.merged(local:library.sortedSongs,remote:tracks)
+        await player.play(UnifiedTrack(track,local:library.songs.first { $0.sourceIDs.contains(track.id) }).song,queue:entries.map(\.song),repository:library.repository)
     }
     func cancelDownloads() { Task { await BackgroundDownloads.shared.pause() } }
     func download(_ selected: [PCTrack], library: LibraryStore) {

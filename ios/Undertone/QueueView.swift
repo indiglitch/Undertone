@@ -22,7 +22,10 @@ struct QueueView: View {
                 }
                 Section("Далее · \(player.upcoming.count)") {
                     ForEach(player.upcoming) { song in
-                        Button { if selecting { if !selected.insert(song.id).inserted { selected.remove(song.id) } } else { Task { await player.selectQueued(song) } } } label: { HStack { if selecting { Image(systemName:selected.contains(song.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(Color.undertone) }; row(song) } }.buttonStyle(.plain)
+                        HStack {
+                            if selecting { Button { if !selected.insert(song.id).inserted { selected.remove(song.id) } } label: { Image(systemName:selected.contains(song.id) ? "checkmark.circle.fill" : "circle").frame(width:32,height:44) } }
+                            row(song)
+                        }
                     }
                     .onDelete { player.removeUpcoming($0) }
                     .onMove { player.moveUpcoming($0, to: $1) }
@@ -39,15 +42,7 @@ struct QueueView: View {
                 ToolbarItem(placement: .topBarLeading) { HStack { EditButton(); Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } } }
                 ToolbarItem(placement: .topBarTrailing) { Button("Закрыть", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }
             }
-        }.presentationDragIndicator(.visible)
+        }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.presentationDragIndicator(.visible)
     }
-    private func row(_ song: Song) -> some View {
-        HStack(spacing: 12) {
-            CoverArtwork(id: song.syncID ?? song.id)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-        }.padding(.vertical, 4).contentShape(Rectangle())
-    }
+    private func row(_ song: Song) -> some View { UnifiedTrackRow(track:UnifiedTrack(song),action: { Task { await player.selectQueued(song) } }) }
 }

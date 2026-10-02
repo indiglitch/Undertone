@@ -17,6 +17,11 @@ struct PlaybackQueue {
         if !songs.contains(where: { $0.id == selected.id }) { songs.insert(selected, at: 0) }
         index = songs.firstIndex(where: { $0.id == selected.id }) ?? 0
     }
+    mutating func materialize(_ id: String, with song: Song) {
+        guard let position = songs.firstIndex(where: { $0.id == id }) else { return }
+        songs[position] = song
+        // Preserve index, history, repeat mode and future items when a remote original arrives.
+    }
     mutating func enqueue(_ song: Song, next: Bool) {
         guard !songs.isEmpty else { songs = [song]; index = 0; return }
         guard song.id != current?.id else { return }

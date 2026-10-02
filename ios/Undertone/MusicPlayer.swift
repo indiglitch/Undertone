@@ -30,6 +30,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var sessionSave: Task<Void,Never>?
     private var lastCheckpoint = Date.distantPast
     var onTrack: ((Song) -> Void)?
+    var resolveSong: ((Song) async throws -> Song)?
     func checkpoint() {
         guard let current else { return }
         let snapshot = PlayerSnapshot(ids: playbackQueue.songs.map(\.id), currentID: current.id, repeatMode: repeatMode.rawValue, position: position.isFinite ? max(0, position) : 0)
@@ -41,7 +42,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         do {
             guard let saved = try await sessionStorage.read() else { return }
             let mapped = Dictionary(songs.map { ($0.id, $0) }, uniquingKeysWith: { a,_ in a })
-            guard let selected = mapped[saved.currentID] else { return }
+            guard let selected = mapped[saved.currentID], !selected.filename.isEmpty else { return }
             playbackQueue.replace(saved.ids.compactMap { mapped[$0] }, selected: selected)
             playbackQueue.mode = RepeatMode(rawValue: saved.repeatMode) ?? .off
             await start(selected, repository: repository, autoplay: false, initialPosition: saved.position)
@@ -115,6 +116,11 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
         if fadeDuration <= 0 { oldAudio?.stop() } else { fadingAudio = oldAudio }; audio = nil; vorbis?.stop(); vorbis = nil
         playing = false
         do {
+            let requested = song
+            let originalID = requested.id
+            let song = try await resolveSong?(requested) ?? requested
+            guard generation == playGeneration else { return }
+            playbackQueue.materialize(originalID, with: song)
             let url = try await repository.fileURL(song)
             guard generation == playGeneration else { return }
             let session = AVAudioSession.sharedInstance()

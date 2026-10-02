@@ -74,7 +74,7 @@ struct RootView: View {
             RadialGradient(colors: [.undertone.opacity(0.19), .clear], center: .topTrailing, startRadius: 0, endRadius: 420).ignoresSafeArea()
             tabs
         }
-        .background { DownloadErrorAlerts() }
+        .overlay(alignment:.top) { if !expandedPlayer && routes.route == nil { AppErrorToast().padding(.horizontal,16).padding(.top,8) } }
         .task {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--preview-search") { tab = .search }
@@ -98,12 +98,7 @@ struct RootView: View {
             }
         }
         .sheet(isPresented: $expandedPlayer) { PlayerView().environmentObject(player).environmentObject(player.clock) }
-        .alert("Не удалось завершить действие", isPresented: Binding(
-            get: { library.error != nil || player.error != nil || pc.error != nil || personal.error != nil || routes.error != nil },
-            set: { if !$0 { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil; routes.error = nil } }
-        )) {
-            Button("Понятно", role: .cancel) { library.error = nil; player.error = nil; pc.error = nil; personal.error = nil; routes.error = nil }
-        } message: { Text(library.error ?? player.error ?? pc.error ?? personal.error ?? routes.error ?? "") }
+
     }
 
     private var tabs: some View {
@@ -123,6 +118,12 @@ NavigationStack {
                         .navigationBarTitleDisplayMode(item == .home ? .inline : .large)
                         .toolbar {
                             if item == .home {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Синхронизировать", systemImage:"arrow.triangle.2.circlepath") {
+                                        if pc.address.isEmpty { devicePresented = true }
+                                        else { Task { await pc.migratePlaylists(personal,library:library); await pc.refresh() } }
+                                    }.disabled(pc.refreshing).accessibilityIdentifier("syncLibrary")
+                                }
                                 ToolbarItem(placement: .topBarTrailing) {
                                     Button("Добавить файлы", systemImage: "plus") { importer = true }
                                         .disabled(library.importing || pc.downloading != nil)
@@ -144,7 +145,7 @@ NavigationStack {
 Group {
                             if item == .library { LibraryHubView() }
                             else if item == .search { MobileSearchView() }
-                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Плейлист или папка") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
+                            else if item == .create { VStack(spacing:24) { Image(systemName:"plus.circle.fill").font(.system(size:60)).foregroundStyle(Color.undertone); Text("Твоя коллекция").font(.title.bold()); Button("Создать плейлист") { creating = true }.buttonStyle(.glassProminent); Button("Импортировать файлы") { importer = true }.buttonStyle(.glass) }.frame(maxWidth:.infinity,maxHeight:.infinity) }
                             else {
                                 ScrollView {
                                     LazyVStack(alignment: .leading, spacing: 28) {
@@ -164,32 +165,21 @@ Group {
             }.font(.caption2).foregroundStyle(.secondary)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("Любимые треки") } label: { homeShortcut("Любимые треки",icon:"heart.fill") }
-                NavigationLink { MusicLibraryView(downloadsOnly:true,showRoot:false).navigationTitle("На iPhone") } label: { homeShortcut("Скачанное",icon:"arrow.down.circle.fill") }
-                NavigationLink { MusicLibraryView(localFiles:true,showRoot:false).navigationTitle("Локальные файлы") } label: { homeShortcut("Локальные файлы",icon:"music.note") }
+                NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("Все треки") } label: { homeShortcut("Все треки",icon:"music.note") }
                 Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "Подключить ПК" : "Библиотека ПК",icon:"desktopcomputer") }
-                ForEach(personal.state.playlists.prefix(2)) { playlist in
-                    NavigationLink { PersonalPlaylistView(id:playlist.id) } label: { homeShortcut(playlist.name,icon:"music.note.list") }
+                ForEach(pc.collections.playlists.prefix(2)) { playlist in
+                    SharedPlaylistLink(playlist:playlist).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
                 }
             }.buttonStyle(.plain)
-            if library.songs.isEmpty {
+            if library.songs.isEmpty && pc.tracks.isEmpty {
                 emptyLibrary
             } else {
-                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "Недавно слушали", detail: "На устройстве")
-                songList(personal.state.recents.isEmpty ? library.recentSongs : Array(personal.state.recents.compactMap { id in library.songs.first(where:{$0.id == id}) }.prefix(8)))
-                sectionHeading("Альбомы", detail: "\(library.albums.count)")
+                sectionHeading(personal.state.recents.isEmpty ? "Недавно добавлено" : "Недавно слушали", detail: "Твоя библиотека")
+                songList(homeTracks)
+                sectionHeading("Альбомы", detail: "\(Set(library.albums.keys).union(pc.albums.keys).count)")
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
-                        ForEach(library.albums.keys.sorted(), id: \.self) { key in
-                            if let songs = library.albums[key], let first = songs.first {
-                                NavigationLink { MusicLibraryView(album:key).navigationTitle(first.album) } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        CoverArtwork(id: first.syncID ?? first.id, size: 116)
-                                        Text(first.album).font(.subheadline.weight(.semibold)).lineLimit(2)
-                                        Text(first.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                    }.frame(width: 116, alignment: .leading)
-                                }.buttonStyle(.plain)
-                            }
-                        }
+                        ForEach(Array(Set(library.albums.keys).union(pc.albums.keys)).sorted(),id: \.self) { AlbumTile(name:$0) }
                     }
                 }
             }
@@ -216,26 +206,12 @@ Group {
     private func sectionHeading(_ title: String, detail: String) -> some View {
         HStack { Text(title).font(.title3.bold()); Spacer(); Text(detail).font(.caption).foregroundStyle(.secondary) }
     }
-    private func songList(_ songs: [Song]) -> some View {
-        LazyVStack(spacing: 4) {
-            ForEach(songs) { song in
-                Button { start(song, queue: songs) } label: {
-                    HStack(spacing: 13) {
-                        CoverArtwork(id: song.syncID ?? song.id, size: 44)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(song.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                            Text(song.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Spacer(minLength: 4)
-                        VStack(alignment: .trailing, spacing: 5) {
-                            Text(song.format).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.undertone)
-                            Image(systemName: player.current?.id == song.id && player.playing ? "waveform" : "checkmark.circle.fill")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }.padding(.vertical, 6).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel("Воспроизвести \(song.title), \(song.artist)")
-            }
-        }
+    private var homeTracks: [UnifiedTrack] {
+        let all = TrackCatalog.merged(local:library.songs,remote:pc.tracks,sort:.newest)
+        return Array((personal.state.recents.isEmpty ? all : TrackCatalog.merged(local:library.songs,remote:pc.tracks,order:personal.state.recents)).prefix(8))
+    }
+    private func songList(_ tracks: [UnifiedTrack]) -> some View {
+        LazyVStack(spacing:4) { ForEach(tracks) { track in UnifiedTrackRow(track:track,queue:tracks.map(\.song)) } }
     }
     private func start(_ song: Song, queue: [Song]) {
         Task { await player.play(song, queue: queue, repository: library.repository) }
@@ -256,7 +232,9 @@ Group {
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
             Button("Следующий трек", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
                 .labelStyle(.iconOnly).frame(width: 44, height: 44)
+            Menu { TrackContextMenu(track:UnifiedTrack(song)) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню " + song.title)
         }.padding(.horizontal, 12).padding(.vertical, 4)
+            .contextMenu { TrackContextMenu(track:UnifiedTrack(song)) }
     }
 }
 
@@ -300,12 +278,12 @@ struct PlayerView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("Действия с треком", systemImage: "ellipsis") {
-                        if let song = player.current { ShareOriginalButton(song: song) }
-                        Button("Очередь", systemImage: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
+                        if let song = player.current { TrackContextMenu(track:UnifiedTrack(song)) }
                     }
                 }
             }
         }.environmentObject(sharing)
+            .overlay(alignment:.top) { if !queuePresented { AppErrorToast().padding(.horizontal,16).padding(.top,8) } }
             .presentationDragIndicator(.visible)
             .sheet(item: $sharing.payload) { SystemShareSheet(items: $0.items) }
             .sheet(isPresented: $queuePresented) { QueueView() }

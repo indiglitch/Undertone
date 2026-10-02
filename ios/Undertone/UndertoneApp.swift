@@ -26,8 +26,16 @@ struct UndertoneApp: App {
                 .preferredColorScheme(.dark)
                 .tint(.undertone)
                 .task {
-                    downloads.onInstall = { await library.load() }
-                    await library.load(); await personal.load(); player.onTrack = { personal.record($0.id) }; await player.restore(library.songs, repository: library.repository); await pc.initialize(); await downloads.initialize(); pc.activate()
+                    #if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--ui-fixture") { try? await NativeUITestFixture.prepare() }
+                    #endif
+                    downloads.onInstall = { await library.load(); await pc.migratePlaylists(personal,library:library); await pc.syncCollections(quiet:true) }
+                    await library.load(); await personal.load(); await pc.initialize()
+                    player.onTrack = { personal.record($0.id) }
+                    player.resolveSong = { [weak pc, weak library] song in guard let pc, let library else { throw PCError.disconnected }; return try await pc.resolve(song,library:library) }
+                    await pc.migratePlaylists(personal,library:library)
+                    await player.restore(TrackCatalog.merged(local:library.songs,remote:pc.tracks).map(\.song), repository: library.repository)
+                    await downloads.initialize(); pc.activate()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { pc.activate(); Task { await library.load() } }

@@ -10,6 +10,7 @@ struct PlaylistEditorView: View {
     let isPC: Bool
     @State private var order: [String] = []
     @State private var baseline: [String] = []
+    @State private var name = ""
     @State private var description = ""
     @State private var coverImport = false
     @State private var coverRevision = 0
@@ -21,9 +22,12 @@ struct PlaylistEditorView: View {
                 Section("Обложка на iPhone") {
                     HStack { CoverArtwork(id:coverID,size:72).id(coverRevision); Button("Выбрать изображение") { coverImport = true } }
                 }
-                Section("Описание") { TextField("Описание",text:$description,axis:.vertical) }
+                Section("Плейлист") { TextField("Название",text:$name); TextField("Описание",text:$description,axis:.vertical) }
                 Section("Треки · \(order.count)") {
-                    ForEach(Array(order.enumerated()),id:\.offset) { _,track in Text(title(track)) }
+                    ForEach(Array(order.enumerated()),id:\.offset) { _,identity in
+                        if let item = TrackCatalog.merged(local:library.songs,remote:pc.tracks,order:[identity]).first { UnifiedTrackRow(track:item) }
+                        else { Text("Недоступный трек").foregroundStyle(.secondary) }
+                    }
                     .onDelete { order.remove(atOffsets:$0) }
                     .onMove { order.move(fromOffsets:$0,toOffset:$1) }
                     if order.isEmpty { Text("Добавь треки из меню песни").foregroundStyle(.secondary) }
@@ -33,16 +37,15 @@ struct PlaylistEditorView: View {
             .toolbar {
                 ToolbarItem(placement:.topBarLeading) { Button("Отмена") { dismiss() } }
                 ToolbarItem(placement:.topBarTrailing) { Button("Сохранить") {
-                    if isPC {
-                        if order != baseline { pc.edit(PCEdit(kind:"replace_tracks",playlist:id,tracks:order,expected_tracks:baseline)) }
-                        pc.edit(PCEdit(kind:"describe_playlist",playlist:id,description:description))
-                    } else { personal.update { if let index = $0.playlists.firstIndex(where: { $0.id == id }) { $0.playlists[index].tracks = order; $0.playlists[index].description = description } } }
+                    if order != baseline { pc.edit(PCEdit(kind:"replace_tracks",playlist:id,tracks:order,expected_tracks:baseline)) }
+                    pc.edit(PCEdit(kind:"rename_playlist",playlist:id,name:name.trimmingCharacters(in:.whitespacesAndNewlines)))
+                    pc.edit(PCEdit(kind:"describe_playlist",playlist:id,description:description))
                     dismiss()
-                }.disabled(description.count > 2000) }
+                }.disabled(description.count > 2000 || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || name.count > 120) }
             }
             .onAppear {
-                if isPC { order = pc.collections.playlists.first(where: { $0.id == id })?.tracks ?? []; description = pc.collections.playlists.first(where: { $0.id == id })?.description ?? "" }
-                else { order = personal.state.playlists.first(where: { $0.id == id })?.tracks ?? []; description = personal.state.playlists.first(where: { $0.id == id })?.description ?? "" }
+                let playlist = pc.collections.playlists.first { $0.id == id }
+                order = playlist?.tracks ?? []; name = playlist?.name ?? ""; description = playlist?.description ?? ""
                 baseline = order
             }
             .fileImporter(isPresented:$coverImport,allowedContentTypes:[.image]) { result in Task { do {

@@ -35,11 +35,10 @@ struct MusicRouteView: View {
                 case "artist": MusicLibraryView(artist:route.value).navigationTitle(route.value)
                 case "track": MusicLibraryView(orderedIDs:[route.value],showRoot:false).navigationTitle("Трек")
                 default:
-                    if personal.state.playlists.contains(where:{$0.id == route.value}) { PersonalPlaylistView(id:route.value).navigationTitle("Плейлист") }
-                    else if pc.collections.playlists.contains(where:{$0.id == route.value}) { MusicLibraryView(playlistID:route.value).navigationTitle("Плейлист") }
+                    if pc.collections.playlists.contains(where:{$0.id == route.value.replacingOccurrences(of:"-",with:"").lowercased()}) { MusicLibraryView(playlistID:route.value.replacingOccurrences(of:"-",with:"").lowercased()).navigationTitle("Плейлист") }
                     else { ContentUnavailableView("Плейлист не найден",systemImage:"music.note.list",description:Text("Ссылка открывает объект в твоей библиотеке. Она не передаёт музыку или доступ к ПК.")) }
                 }
-            }.toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { dismiss() } } }
+            }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { dismiss() } } }
         }
     }
 }

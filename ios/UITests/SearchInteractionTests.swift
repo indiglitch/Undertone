@@ -4,7 +4,7 @@ final class SearchInteractionTests: XCTestCase {
     private func searchApp() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--preview-search"]
+        app.launchArguments = ["--ui-fixture", "--preview-search"]
         app.launch()
         XCTAssertTrue(app.textFields["musicSearchField"].waitForExistence(timeout: 15))
         return app
@@ -16,6 +16,8 @@ final class SearchInteractionTests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let done = app.buttons["dismissSearchKeyboard"]
         XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier:"dismissSearchKeyboard").count,1)
+        XCTAssertFalse(app.navigationBars.buttons["Готово"].exists)
         done.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
         field.tap()

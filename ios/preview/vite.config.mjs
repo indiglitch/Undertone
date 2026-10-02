@@ -12,7 +12,7 @@ export default defineConfig({
     server.middlewares.use('/native-preview', (req, res) => {
       const name = req.url.split('?')[0].slice(1);
       if (!['home.png','search.png','player.png'].includes(name)) { res.statusCode = 404; res.end(); return; }
-      const file = path.resolve('qa-output/ios/0.5.2', name);
+      const file = path.resolve('qa-output/ios', fs.readFileSync('ios/project.yml','utf8').match(/MARKETING_VERSION: '([^']+)'/)?.[1] || '0.6.0', name);
       if (!fs.existsSync(file)) { res.statusCode = 404; res.end('Native capture is awaiting CI'); return; }
       res.setHeader('Content-Type','image/png'); fs.createReadStream(file).pipe(res);
     });
