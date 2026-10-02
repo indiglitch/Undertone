@@ -59,7 +59,7 @@ struct MusicLibraryView: View {
                     }.padding(.vertical,12)
                     HStack {
                         Button("Слушать", systemImage: "play.fill") { if let first = songs.first { Task { await player.play(first, queue: songs, repository: library.repository) } } }.disabled(songs.isEmpty)
-                        Button("Перемешать", systemImage: "shuffle") { let shuffled = songs.shuffled(); if let first = shuffled.first { Task { await player.play(first, queue: shuffled, repository: library.repository) } } }.disabled(songs.isEmpty)
+                        Button("Перемешать", systemImage: "shuffle") { let shuffled = songs.shuffled(); if let first = shuffled.first { Task { await player.play(first, queue: shuffled, repository: library.repository) } } }.labelStyle(.iconOnly).frame(minWidth:44,minHeight:44).disabled(songs.isEmpty)
                     }.buttonStyle(.glass)
                     if favoritesOnly { Button("Создать плейлист из результата") { personal.update { $0.playlists.append(PersonalPlaylist(name:"Любимые треки",tracks:songs.map(\.id)+remote.map(\.id))) } } }
                     if !remote.isEmpty && !downloadsOnly { Button("Скачать оригиналы", systemImage: "arrow.down.circle") { pc.download(remote, library: library) } }
@@ -174,13 +174,13 @@ struct MusicLibraryView: View {
             }
         }
         .sheet(isPresented:$editingOrder) { PlaylistEditorView(id:playlistID ?? "", isPC:true) }
-        .listStyle(.plain).scrollContentBackground(.hidden)
+        .listStyle(.plain).scrollContentBackground(.hidden).scrollDismissesKeyboard(.interactively)
         .modifier(OptionalMusicSearch(query: $query, enabled: externalQuery == nil))
         .refreshable { await pc.refresh() }
         .confirmationDialog("Удалить выбранные копии с iPhone? Оригиналы на ПК останутся.",isPresented:$removing) { Button("Удалить с iPhone",role:.destructive) { let removing = songs.filter { selected.contains($0.id) }; Task { await library.removeCopies(removing); player.forgetFiles(Set(removing.map(\.id)).subtracting(library.sortedSongs.map(\.id))) }; selected = [] } }
         .toolbar {
-            ToolbarItem(placement:.topBarTrailing) { Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } }
-            if playlistID == nil && orderedIDs == nil && album == nil {
+            if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) { Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } } }
+            if externalQuery == nil && playlistID == nil && orderedIDs == nil && album == nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu("Сортировка", systemImage: "arrow.up.arrow.down") {
                         Picker("Сортировка", selection: $sortValue) { ForEach(LibrarySort.allCases) { Text($0.title).tag($0.rawValue) } }

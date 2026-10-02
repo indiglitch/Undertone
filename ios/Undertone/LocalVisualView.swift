@@ -36,8 +36,8 @@ struct LocalVisualView: View {
             } }
             if let video,canvasEnabled { VideoPlayer(player:video).frame(height:220).clipShape(RoundedRectangle(cornerRadius:18)) }
             if file != nil { Button(videoMode ? "Вернуться к музыке" : "Открыть видео со звуком") { if videoMode { video?.pause(); player.resume() } else { player.pause(); video?.pause() }; videoMode.toggle() } }
-            else { Text("Можно добавить собственный клип к треку. Автоматического каталога видео нет.").font(.caption).foregroundStyle(.secondary) }
-        }.padding(20).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:24))
+            else { Text("Добавить клип к треку можно через меню ⋯").font(.caption).foregroundStyle(.secondary) }
+        }.padding(file == nil ? 14 : 20).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:20))
         .task(id:player.current?.id) { video?.pause(); video = nil; loop = nil; file = nil; guard let id = player.current?.id else { return }; await load(id) }
         .onChange(of:phase) { _,value in if value == .active && canvasEnabled && player.playing { video?.play() } else { video?.pause() } }
         .onChange(of:player.playing) { _,value in if value && canvasEnabled && phase == .active { video?.play() } else { video?.pause() } }

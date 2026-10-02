@@ -75,6 +75,16 @@ struct RootView: View {
             tabs
         }
         .background { DownloadErrorAlerts() }
+        .task {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--preview-search") { tab = .search }
+            #endif
+        }
+        .onChange(of: player.current?.id) { _, id in
+            #if DEBUG
+            if id != nil && ProcessInfo.processInfo.arguments.contains("--preview-player") { expandedPlayer = true }
+            #endif
+        }
         .onChange(of:createVisible) { _, value in if !value && tab == .create { tab = .home } }
         .sheet(isPresented:$creating) { CreateMusicView() }
         .sheet(isPresented:$devicePresented) { NavigationStack { ScrollView { PCDeviceView().padding(22) }.navigationTitle("Компьютер").toolbar { ToolbarItem(placement:.topBarTrailing) { Button("Закрыть") { devicePresented = false } } } } }
@@ -256,6 +266,7 @@ struct PlayerView: View {
     @EnvironmentObject private var personal: PersonalLibrary
     @EnvironmentObject private var pc: PCConnection
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var sharing = ShareCoordinator()
     @State private var queuePresented = false
     @State private var seeking = false
     @State private var seekPosition = 0.0
@@ -267,52 +278,92 @@ struct PlayerView: View {
         NavigationStack {
             GeometryReader { geometry in
                 ScrollView {
-                    VStack(spacing: 30) {
-                        CoverArtwork(id: player.current.map { $0.syncID ?? $0.id }, size: min(geometry.size.width - 52, 350)).padding(.top, 24)
-                        VStack(spacing: 8) {
-                            Text(player.current?.title ?? "Нет выбранного трека").font(.title2.bold()).multilineTextAlignment(.center)
-                            Text(player.current?.artist ?? "").foregroundStyle(.secondary)
-                            Text("\(player.current?.format ?? "") · Оригинальный файл").font(.caption).foregroundStyle(Color.undertone)
-                        }
-                        VStack(spacing: 6) {
-                            Slider(value: Binding(get: { seeking ? seekPosition : playbackClock.position }, set: { seekPosition = $0 }), in: 0...max(1, player.duration)) { editing in
-                                if editing { seekPosition = playbackClock.position; seeking = true }
-                                else { player.seek(seekPosition); seeking = false }
-                            }.accessibilityLabel("Позиция воспроизведения")
-                            HStack { Text(clock(seeking ? seekPosition : playbackClock.position)); Spacer(); Text(clock(player.duration)) }
-                                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        GlassEffectContainer(spacing: 20) {
-                            HStack(spacing: 24) {
-                                Button("Предыдущий трек", systemImage: "backward.end.fill") { Task { await player.advance(-1) } }
-                                    .frame(width: 56, height: 56).buttonStyle(.glass)
-                                Button(player.playing ? "Пауза" : "Воспроизвести", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
-                                    .font(.title).frame(width: 76, height: 76).buttonStyle(.glassProminent)
-                                Button("Следующий трек", systemImage: "forward.end.fill") { Task { await player.advance(1) } }
-                                    .frame(width: 56, height: 56).buttonStyle(.glass)
-                            }.labelStyle(.iconOnly)
-                        }
-                        HStack(spacing: 24) {
-                            Button("Очередь", systemImage: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
-                            Button(player.repeatMode.title, systemImage: player.repeatMode.icon) { player.cycleRepeat() }
-                                .tint(player.repeatMode == .off ? .secondary : Color.undertone)
-                        }.buttonStyle(.glass).controlSize(.large)
-                        if let song = player.current {
-                            HStack {
-                                Button("В любимые",systemImage:(song.syncID.map { pc.likedIDs.contains($0) } ?? personal.state.likes.contains(song.id)) ? "heart.fill" : "heart") { if let id = song.syncID { pc.edit(PCEdit(kind:"like",track:id,liked:!pc.likedIDs.contains(id))) } else { personal.toggleLike(song.id) } }
-                                ShareOriginalButton(song:song)
-                            }.buttonStyle(.glass)
+                    VStack(spacing: 20) {
+                        CoverArtwork(id: player.current.map { $0.syncID ?? $0.id }, size: min(geometry.size.width - 48, geometry.size.height * 0.43, 350))
+                            .padding(.top, 12)
+                        trackHeading
+                        timeline
+                        transport
+                        secondaryActions
+                        if player.current != nil {
                             SongLyricsView()
                             LocalVisualView()
                         }
-                        Label("Доступно офлайн", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
-                    }.padding(.horizontal, 26).padding(.bottom, 30).frame(maxWidth: .infinity)
-                }
+                    }.padding(.horizontal, 24).padding(.bottom, 32).frame(maxWidth: .infinity)
+                }.scrollIndicators(.hidden)
             }
             .background(Color.canvas)
             .navigationTitle("Сейчас играет").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Закрыть", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) } }
-        }.presentationDragIndicator(.visible)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Свернуть плеер", systemImage: "chevron.down") { dismiss() }.labelStyle(.iconOnly)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu("Действия с треком", systemImage: "ellipsis") {
+                        if let song = player.current { ShareOriginalButton(song: song) }
+                        Button("Очередь", systemImage: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
+                    }
+                }
+            }
+        }.environmentObject(sharing)
+            .presentationDragIndicator(.visible)
+            .sheet(item: $sharing.payload) { SystemShareSheet(items: $0.items) }
             .sheet(isPresented: $queuePresented) { QueueView() }
+    }
+    private var trackHeading: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(player.current?.title ?? "Нет выбранного трека").font(.title2.bold()).lineLimit(2)
+                Text(player.current?.artist ?? "").font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text("\(player.current?.format ?? "") · Оригинальный файл").font(.caption2).foregroundStyle(Color.undertone)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if let song = player.current {
+                let liked = song.syncID.map { pc.likedIDs.contains($0) } ?? personal.state.likes.contains(song.id)
+                Button(liked ? "Убрать из любимых" : "В любимые", systemImage: liked ? "heart.fill" : "heart") {
+                    if let id = song.syncID { pc.edit(PCEdit(kind: "like", track: id, liked: !pc.likedIDs.contains(id))) }
+                    else { personal.toggleLike(song.id) }
+                }.labelStyle(.iconOnly).font(.title3).frame(width: 44, height: 44).tint(liked ? .undertone : .primary)
+            }
+        }
+    }
+    private var timeline: some View {
+        VStack(spacing: 2) {
+            Slider(value: Binding(get: { seeking ? seekPosition : playbackClock.position }, set: { seekPosition = $0 }), in: 0...max(1, player.duration)) { editing in
+                if editing { seekPosition = playbackClock.position; seeking = true }
+                else { player.seek(seekPosition); seeking = false }
+            }.accessibilityLabel("Позиция воспроизведения")
+            HStack { Text(clock(seeking ? seekPosition : playbackClock.position)); Spacer(); Text("−" + clock(max(0, player.duration - (seeking ? seekPosition : playbackClock.position)))) }
+                .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+        }
+    }
+    private var transport: some View {
+        HStack(spacing: 0) {
+            playerButton("Перемешать следующие треки", icon: "shuffle") { player.shuffleUpcoming() }
+                .disabled(player.upcoming.count < 2)
+            Spacer(minLength: 0)
+            playerButton("Предыдущий трек", icon: "backward.end.fill") { Task { await player.advance(-1) } }
+            Spacer(minLength: 0)
+            Button(player.playing ? "Пауза" : "Воспроизвести", systemImage: player.playing ? "pause.fill" : "play.fill") { player.toggle() }
+                .labelStyle(.iconOnly).font(.system(size: 28, weight: .semibold))
+                .frame(width: 72, height: 72).background(Color.undertone, in: Circle()).foregroundStyle(.white)
+                .buttonStyle(.plain)
+            Spacer(minLength: 0)
+            playerButton("Следующий трек", icon: "forward.end.fill") { Task { await player.advance(1) } }
+            Spacer(minLength: 0)
+            playerButton(player.repeatMode.title, icon: player.repeatMode.icon) { player.cycleRepeat() }
+                .foregroundStyle(player.repeatMode == .off ? Color.primary : Color.undertone)
+        }
+    }
+    private func playerButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: icon).font(.system(size: 21, weight: .medium)).frame(width: 44, height: 44).contentShape(Rectangle()) }
+            .buttonStyle(.plain).accessibilityLabel(title)
+    }
+    private var secondaryActions: some View {
+        HStack {
+            Label("На iPhone", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if let song = player.current { ShareOriginalButton(song: song).labelStyle(.iconOnly).frame(width: 44, height: 44) }
+            playerButton("Очередь", icon: "text.line.first.and.arrowtriangle.forward") { queuePresented = true }
+        }
     }
 }

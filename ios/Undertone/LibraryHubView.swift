@@ -167,15 +167,13 @@ struct MobileSearchView: View {
     @EnvironmentObject private var pc: PCConnection
     @State private var query = ""
     @State private var filter = "Песни"
-    @State private var scanning = false
-    @EnvironmentObject private var routes: RouteCoordinator
+    @FocusState private var searchFocused: Bool
     private var albumNames: [String] { Set(pc.albums.keys).union(library.albums.keys).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
     private var artists: [String] { Set(pc.tracks.map(\.artist)).union(library.songs.map(\.artist)).filter { query.isEmpty || $0.localizedCaseInsensitiveContains(query) }.sorted() }
     var body: some View {
         VStack(spacing: 0) {
-            Button("Сканировать код Undertone",systemImage:"qrcode.viewfinder") { scanning = true }.font(.caption).padding(.bottom,8)
-            HStack { Image(systemName: "magnifyingglass"); TextField("Песня, альбом, исполнитель", text: $query).submitLabel(.search).onSubmit { personal.rememberSearch(query) }; if !query.isEmpty { Button("Очистить", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly) } }.padding(12).background(.white.opacity(0.06),in: RoundedRectangle(cornerRadius: 14)).padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(["Песни","Альбомы","Исполнители","Плейлисты"], id: \.self) { name in Button(name) { filter = name }.buttonStyle(.bordered).tint(filter == name ? .undertone : .gray) } }.padding() }
+            HStack { Image(systemName: "magnifyingglass"); TextField("Песня, альбом, исполнитель", text: $query).focused($searchFocused).submitLabel(.search).onSubmit { personal.rememberSearch(query); searchFocused = false }; if !query.isEmpty { Button("Очистить", systemImage: "xmark.circle.fill") { query = "" }.labelStyle(.iconOnly) } }.padding(12).background(.white.opacity(0.06),in: RoundedRectangle(cornerRadius: 14)).padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(["Песни","Альбомы","Исполнители","Плейлисты"], id: \.self) { name in Button(name) { searchFocused = false; filter = name }.buttonStyle(.bordered).tint(filter == name ? .undertone : .gray) } }.padding() }
             if query.isEmpty && !personal.state.searches.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) { HStack { ForEach(personal.state.searches, id: \.self) { text in Button(text) { query = text }.font(.caption).buttonStyle(.bordered) }; Button("Очистить историю") { personal.update { $0.searches = [] } } }.padding(.horizontal) }
             }
@@ -190,7 +188,15 @@ struct MobileSearchView: View {
                     }
                 }.listStyle(.plain).scrollContentBackground(.hidden)
             }
-        }.sheet(isPresented:$scanning) { QRScanner { code in scanning = false; if let url = URL(string:code) { routes.open(url) } }.ignoresSafeArea().overlay(alignment:.topTrailing) { Button("Закрыть") { scanning = false }.buttonStyle(.glass).padding(24) } }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .onDisappear { searchFocused = false }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Готово") { personal.rememberSearch(query); searchFocused = false }
+            }
+        }
     }
 }
 

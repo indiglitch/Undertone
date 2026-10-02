@@ -9,7 +9,14 @@ export default defineConfig({
     server.watcher.on('change', file => {
       if (file.startsWith(native)) server.ws.send({ type: 'custom', event: 'native-change', data: { file: path.basename(file), time: new Date().toISOString() } });
     });
-    server.middlewares.use('/native-status', (_req, res) => {
+    server.middlewares.use('/native-preview', (req, res) => {
+      const name = req.url.split('?')[0].slice(1);
+      if (!['home.png','search.png','player.png'].includes(name)) { res.statusCode = 404; res.end(); return; }
+      const file = path.resolve('qa-output/ios/0.5.2', name);
+      if (!fs.existsSync(file)) { res.statusCode = 404; res.end('Native capture is awaiting CI'); return; }
+      res.setHeader('Content-Type','image/png'); fs.createReadStream(file).pipe(res);
+    });
+    server.middlewares.use('/native-status' , (_req, res) => {
       const files = fs.readdirSync(native).filter(file => file.endsWith('.swift'));
       const version = fs.readFileSync('ios/project.yml', 'utf8').match(/MARKETING_VERSION: '([^']+)'/)?.[1];
       res.setHeader('Content-Type', 'application/json');res.end(JSON.stringify({ version, files, updated: Math.max(...files.map(file => fs.statSync(path.join(native, file)).mtimeMs)) }));
