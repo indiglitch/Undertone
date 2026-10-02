@@ -2,6 +2,8 @@
 
 ## Version 0.6 — unified personal library
 
+Version 0.6.1 suppresses idle-sync redraws and unchanged writes, uses a 90-second fallback catalog poll, avoids catalog sorting when opening album menus, adds press feedback/soft scroll edges, compact Search and separated toolbar controls. Action captions use uppercase English; music metadata remains unchanged. Shuffle is a visible reversible mode and survives paused-session restoration. Lyrics retry on reconnection and are cached after original downloads; the PC requires PhoneSync 0.5 or newer for the lyrics endpoint.
+
 Home/Search/Library/optional Create; shared PC/iPhone playlists with durable offline edits, pins/bookmarks; playlist order/description editing with PC conflict detection; bulk phone-copy removal/undo; private links/QR and original export; cached/imported synchronized lyrics; user-provided video; explicit offline mode; persisted paused player restoration and system-decoder crossfade. Folders are removed. Coverage and remaining requirements: `docs/mobile/01-feature-matrix.md`. Social/accounts excluded by user. Browser preview is a separate demo counterpart, not an iOS emulator.
 
 Tracks share one context menu and row across Home, Search, collections and queue. Downloaded and remote tracks appear together; tapping a remote track downloads and verifies the original before playback, including when advancing through the queue. Current track and download status are visible. Errors use a short nonblocking popup. Home provides synchronization; Search has one Done action above the keyboard.
