@@ -52,6 +52,7 @@ final class UnifiedInterfaceTests: XCTestCase {
         let menu = app.buttons["Меню Вечером"].firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout:10)); menu.tap()
         XCTAssertTrue(app.buttons["EDIT PLAYLIST"].waitForExistence(timeout:3))
+        XCTAssertTrue(app.buttons["downloadPlaylist"].exists)
         XCTAssertFalse(app.buttons["В папку"].exists)
     }
 }

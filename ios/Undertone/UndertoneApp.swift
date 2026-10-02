@@ -11,6 +11,8 @@ struct UndertoneApp: App {
     @StateObject private var personal = PersonalLibrary()
     @StateObject private var sharing = ShareCoordinator()
     @StateObject private var routes = RouteCoordinator()
+    @State private var downloadsReady = false
+    @AppStorage("offlineMode") private var offline = false
 
     var body: some Scene {
         WindowGroup {
@@ -36,7 +38,13 @@ struct UndertoneApp: App {
                     player.resolveSong = { [weak pc, weak library] song in guard let pc, let library else { throw PCError.disconnected }; return try await pc.resolve(song,library:library) }
                     await pc.migratePlaylists(personal,library:library)
                     await player.restore(TrackCatalog.merged(local:library.songs,remote:pc.tracks).map(\.song), repository: library.repository)
-                    await downloads.initialize(); pc.activate()
+                    await downloads.initialize(); downloadsReady = true; pc.activate()
+                }
+                .task(id: LikedDownloadTrigger(likes:pc.likedIDs.union(personal.state.likes),catalogRevision:pc.catalogRevision,ready:downloadsReady,online:pc.online,offline:offline)) {
+                    guard downloadsReady, pc.online, !offline else { return }
+                    let selected = DownloadSelection.missing(pc.tracks,ids:pc.likedIDs.union(personal.state.likes),installed:library.installedIDs)
+                    guard !selected.isEmpty, !Task.isCancelled else { return }
+                    await downloads.enqueueAutomatic(selected,installed:library.installedIDs)
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { pc.activate(); Task { await library.load() } }

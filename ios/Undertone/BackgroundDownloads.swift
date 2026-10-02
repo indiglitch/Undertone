@@ -142,6 +142,17 @@ final class BackgroundDownloads: ObservableObject {
             await save(); await schedule()
         }
     }
+    func enqueueAutomatic(_ tracks: [PCTrack], installed: Set<String>) async {
+        await enqueue(tracks,installed:installed)
+        let ids = Set(tracks.map(\.id))
+        // Retry only automatic candidates after a reconnect/catalog/like change.
+        // Explicitly paused transfers remain paused; progress does not retrigger this.
+        var changed = false
+        for index in records.indices where ids.contains(records[index].id) && records[index].state == "failed" && records[index].taskID == nil {
+            records[index].state = "queued"; changed = true
+        }
+        if changed { await save(); await schedule() }
+    }
     private func save() async { do { try await persistence.save(records) } catch { self.error = error.localizedDescription } }
     private func schedule() async {
         guard !UserDefaults.standard.bool(forKey:"offlineMode"), !starting, !pausing, let pairing = pairingProvider() else { return }

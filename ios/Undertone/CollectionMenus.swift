@@ -11,7 +11,8 @@ struct PlaylistContextMenu: View {
     var body: some View {
         Button("PLAY",systemImage:"play.fill") { play(entries()) }
         Button("SHUFFLE",systemImage:"shuffle") { play(entries(),shuffle:true) }
-        Button("DOWNLOAD ORIGINALS",systemImage:"arrow.down.circle") { pc.download(entries().compactMap(\.remote),library:library) }
+        Button("DOWNLOAD PLAYLIST",systemImage:"arrow.down.circle") { pc.download(entries().compactMap(\.remote),library:library) }
+            .accessibilityIdentifier("downloadPlaylist")
         Button(personal.state.pins.contains(playlist.id) ? "UNPIN" : "PIN",systemImage:"pin") { personal.togglePin(playlist.id) }
         Button("EDIT PLAYLIST",systemImage:"pencil") { edit() }
         ShareLink(item:MusicLinks.make("playlist",playlist.id)) { Label("SHARE",systemImage:"square.and.arrow.up") }
