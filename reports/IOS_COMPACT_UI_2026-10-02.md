@@ -14,7 +14,10 @@ References: [Spotify mobile screenshot](https://www.tryexponent.com/courses/app-
 | Native mini-player inserted inside every NavigationStack | One system TabView bottom accessory across tabs; compact 36px artwork, 44px transport hit targets, system-provided surface |
 | Tall developer sidebar pushed the phone below the browser viewport | Sticky phone stage fits the visible window; mobile-width layout retains ordinary flow |
 | Existing version 0.5.0 | New iOS patch version 0.5.1; music and pairing identity unchanged |
+| One large root SwiftUI expression | Separate tabScreen/tabPage/accessory components keep type checking bounded; iOS 26.0 uses the original accessory API and 26.1+ uses explicit enabled state |
 
 Verification: browser production build passed. Live browser checks covered populated/empty Home, Library, pause/play and scroll. Geometry at the observed 720px browser height: phone top 32/bottom 688; player bottom 612.19, tabs top 618.34 (positive separation); content ends above player. Empty state has no mini-player and content ends above tabs. Screenshot: qa-output/ios-preview/0.5.1-compact-home.png.
 
-Native source commit e72041f and GitHub run 36946589908: final result recorded below after completion. Physical iPhone layout, large-font behavior and actual audio remain separate device checks; browser demonstration is not an iOS simulator.
+Native source commit 50df99d: [GitHub run 36947991770](https://github.com/indiglitch/Undertone/actions/runs/36947991770) succeeded with 32/32 tests and zero failures, Release device build and IPA signature/package verification. Earlier compiler failures identified the API's iOS 26.1 availability and an overly complex expression; both fixed in the final source. Log: qa-output/ios/0.5.1-36947991770.log.
+
+Artifact: releases/ios/0.5.1/Undertone-SideStore.ipa. Inspected version 0.5.1, bundle local.undertone.ios, minimum iOS 26.0, 1,144,151 bytes. SHA-256: 7ad7e4501368674a5ad1e06c6fd0c050aebe3ec8bfaf83118507c47d6a3738eb. Native empty-Home screenshot inspected at qa-output/ios/0.5.1/Undertone-iPhone.png; compact header/tiles are visible. Populated native accessory placement, large-font behavior and real iPhone audio remain separate device checks; browser demonstration is not an iOS simulator. Update through the existing iLoader path without uninstalling.
