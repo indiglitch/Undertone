@@ -17,7 +17,7 @@ struct DownloadsView: View {
                     Button(downloads.active ? "PAUSE ALL" : "RESUME ALL") { Task { if downloads.active { await downloads.pause() } else { await downloads.resume() } } }
                     Spacer()
                     Button("CLEAR QUEUE",role:.destructive) { Task { await downloads.cancelAll() } }
-                }.disabled(downloads.pausing || downloads.records.isEmpty)
+                }.buttonStyle(.borderless).disabled(downloads.pausing || downloads.records.isEmpty)
             }
             if downloads.records.isEmpty { ContentUnavailableView("NO DOWNLOADS",systemImage:"arrow.down.circle",description:Text("Загрузки из меню трека, альбома или плейлиста появятся здесь.")) }
             ForEach(downloads.records) { record in
@@ -36,7 +36,7 @@ struct DownloadsView: View {
                 }.padding(.vertical,4)
             }
             if let error = downloads.error { Section("LAST ERROR") { Text(error).font(.caption).foregroundStyle(.red) } }
-        }.listStyle(.plain).scrollContentBackground(.hidden).modifier(SoftScrollEdges())
+        }.buttonStyle(.borderless).listStyle(.plain).scrollContentBackground(.hidden).modifier(SoftScrollEdges())
             .navigationTitle("DOWNLOADS").navigationBarTitleDisplayMode(.inline)
     }
 }
