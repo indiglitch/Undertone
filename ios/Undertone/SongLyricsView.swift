@@ -54,6 +54,7 @@ struct SongLyricsView: View {
     @EnvironmentObject private var clock: PlaybackClock
     @AppStorage("lyricsPreview") private var preview = true
     @State private var document: LyricsDocument?
+    @State private var reload = 0
     @State private var importing = false
     @State private var expanded = false
     @State private var error: String?
@@ -61,6 +62,7 @@ struct SongLyricsView: View {
     var body: some View {
         VStack(alignment:.leading,spacing:12) {
             HStack { Text("Текст песни").font(.headline); Spacer(); Menu("LYRICS",systemImage:"ellipsis") {
+                Button("REFRESH LYRICS",systemImage:"arrow.clockwise") { reload += 1 }.disabled(!pc.online)
                 Button("IMPORT LRC / TXT") { importing = true }
                 Toggle("PREVIEW",isOn:$preview)
                 if let document { ShareLink(item:document.plain) { Label("SHARE LYRICS",systemImage:"square.and.arrow.up") } }
@@ -68,9 +70,9 @@ struct SongLyricsView: View {
             if let document {
                 if preview { Text(document.lines.first(where: { $0.timestamp_ms == active })?.text ?? String(document.plain.prefix(240))).font(.title3.weight(.semibold)).lineLimit(4) }
                 Button("FULL LYRICS",systemImage:"arrow.up.left.and.arrow.down.right") { expanded = true }
-            } else { Text("Текст пока не добавлен. Можно импортировать свой LRC или TXT; тексты с ПК кэшируются для офлайн-прослушивания.").font(.caption).foregroundStyle(.secondary) }
+            } else { Text("Текст пока не загружен. Подключи ПК и обнови текст через меню; можно также импортировать LRC или TXT.").font(.caption).foregroundStyle(.secondary) }
         }.padding(20).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:24))
-        .task(id:"\(player.current?.id ?? ""):\(pc.online):\(pc.catalogRevision)") {
+        .task(id:"\(player.current?.id ?? ""):\(pc.online):\(pc.catalogRevision):\(reload)") {
             document = nil; guard let song = player.current else { return }
             document = try? await LyricsStorage.shared.read(song.id)
             if let doc = await pc.cacheLyrics(song) {

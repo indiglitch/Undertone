@@ -16,6 +16,23 @@ final class UnifiedLibraryTests: XCTestCase {
         var a = PCCollections(); let b = a; XCTAssertEqual(a,b)
         a.playlists = [PCPlaylist(id:"a",name:"New",tracks:[])]; XCTAssertNotEqual(a,b)
     }
+    func testShuffleRestorationAndMaterializedIdentityRetainOriginalOrder() {
+        let pending = UnifiedTrack(remote(a,title:"Alpha"),local:nil).song
+        let second = local("second"), third = local("third")
+        var queue = PlaybackQueue(); queue.replace([pending,second,third],selected:pending)
+        queue.shuffleUpcoming()
+        let installed = local(String(repeating:"c",count:64),sync:a)
+        queue.materialize(pending.id,with:installed)
+        var restored = PlaybackQueue(); restored.replace(queue.songs,selected:installed)
+        restored.restoreShuffle(queue.shuffled,originalIDs:queue.originalOrder)
+        restored.shuffleUpcoming()
+        XCTAssertEqual(restored.songs.map(\.id),[installed.id,second.id,third.id])
+    }
+    func testOlderPlayerSnapshotWithoutShuffleFieldsStillDecodes() throws {
+        let bytes = Data(#"{"ids":["a"],"currentID":"a","repeatMode":"off","position":0}"#.utf8)
+        let snapshot = try JSONDecoder().decode(PlayerSnapshot.self,from:bytes)
+        XCTAssertNil(snapshot.shuffleEnabled); XCTAssertNil(snapshot.shuffleOriginalIDs)
+    }
     private let a = String(repeating:"a",count:32), b = String(repeating:"b",count:32)
     private func local(_ id: String, sync: String? = nil, title: String = "Alpha") -> Song { Song(id:id,syncID:sync,filename:"file.wav",title:title,artist:"Artist",album:"Album",duration:10,size:100,format:"WAV",addedAt:Date()) }
     private func remote(_ id: String, title: String) -> PCTrack { PCTrack(sync_id:id,title:title,artist:"Artist",album:"Album",duration:10,format:"WAV",size:100) }

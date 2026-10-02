@@ -37,7 +37,7 @@ struct Artwork: View {
 }
 
 enum MobileTab: String, CaseIterable {
-    case home = "Главная", search = "Поиск", library = "Библиотека", create = "Создать"
+    case home = "HOME", search = "SEARCH", library = "LIBRARY", create = "CREATE"
     var icon: String { switch self { case .home: return "house"; case .search: return "magnifyingglass"; case .library: return "square.stack"; case .create: return "plus" } }
 }
 
@@ -331,6 +331,8 @@ struct PlayerView: View {
             Spacer(minLength: 0)
             playerButton(player.repeatMode.title, icon: player.repeatMode.icon) { player.cycleRepeat() }
                 .foregroundStyle(player.repeatMode == .off ? Color.primary : Color.undertone)
+                .background(player.repeatMode == .off ? .clear : Color.undertone.opacity(0.18),in:Circle())
+                .accessibilityValue(player.repeatMode == .off ? "OFF" : "ON")
         }
     }
     private func playerButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {

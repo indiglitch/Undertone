@@ -75,6 +75,8 @@ struct PlayerSnapshot: Codable {
     var currentID: String
     var repeatMode: String
     var position: Double
+    var shuffleEnabled: Bool? = nil
+    var shuffleOriginalIDs: [String]? = nil
 }
 actor PlayerStorage {
     private let path: URL

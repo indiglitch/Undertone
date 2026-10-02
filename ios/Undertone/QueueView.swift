@@ -15,7 +15,9 @@ struct QueueView: View {
                 Section {
                     HStack {
                         Button("SHUFFLE", systemImage: "shuffle") { player.shuffleUpcoming() }
-                            .disabled(player.upcoming.count < 2)
+                            .disabled(player.upcoming.count < 2 && !player.shuffled)
+                            .foregroundStyle(player.shuffled ? Color.undertone : .primary)
+                            .accessibilityValue(player.shuffled ? "ON" : "OFF")
                         Spacer()
                         Button(player.repeatMode.title, systemImage: player.repeatMode.icon) { player.cycleRepeat() }
                             .tint(player.repeatMode == .off ? .secondary : Color.undertone)

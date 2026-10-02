@@ -69,7 +69,7 @@ struct MusicLibraryView: View {
             }.padding(.vertical,8)
             HStack {
                 Button("PLAY",systemImage:"play.fill") { play(entries) }.buttonStyle(.glassProminent)
-                Button("SHUFFLE",systemImage:"shuffle") { play(entries.shuffled()) }.labelStyle(.iconOnly).frame(width:44,height:44)
+                Button("SHUFFLE",systemImage:"shuffle") { play(entries,shuffle:true) }.labelStyle(.iconOnly).frame(width:44,height:44)
                 Spacer()
                 if let album { Menu { AlbumContextMenu(name:album) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) } }
                 if let playlist { Menu { PlaylistContextMenu(playlist:playlist) { editing = true } } label: { Image(systemName:"ellipsis").frame(width:44,height:44) } }
@@ -86,7 +86,7 @@ struct MusicLibraryView: View {
             }.disabled(selected.isEmpty)
         }
     }
-    private func play(_ source: [UnifiedTrack]) { if let first = source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
     private func rebuild() async {
         if !effectiveQuery.isEmpty { try? await Task.sleep(for:.milliseconds(180)); guard !Task.isCancelled else { return } }
         let local = library.songs, remote = pc.tracks, order = orderedIDs ?? playlist?.tracks

@@ -34,7 +34,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var resolveSong: ((Song) async throws -> Song)?
     func checkpoint() {
         guard let current else { return }
-        let snapshot = PlayerSnapshot(ids: playbackQueue.songs.map(\.id), currentID: current.id, repeatMode: repeatMode.rawValue, position: position.isFinite ? max(0, position) : 0)
+        let snapshot = PlayerSnapshot(ids: playbackQueue.songs.map(\.id), currentID: current.id, repeatMode: repeatMode.rawValue, position: position.isFinite ? max(0, position) : 0, shuffleEnabled: shuffled, shuffleOriginalIDs: playbackQueue.originalOrder)
         let previous = sessionSave
         sessionSave = Task { await previous?.value; do { try await sessionStorage.save(snapshot) } catch { self.error = error.localizedDescription } }
     }
@@ -46,6 +46,7 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             guard let selected = mapped[saved.currentID], !selected.filename.isEmpty else { return }
             playbackQueue.replace(saved.ids.compactMap { mapped[$0] }, selected: selected)
             playbackQueue.mode = RepeatMode(rawValue: saved.repeatMode) ?? .off
+            playbackQueue.restoreShuffle(saved.shuffleEnabled ?? false,originalIDs:saved.shuffleOriginalIDs ?? [])
             await start(selected, repository: repository, autoplay: false, initialPosition: saved.position)
         } catch { self.error = "Не удалось восстановить плеер: " + error.localizedDescription }
     }
@@ -102,9 +103,11 @@ final class MusicPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
             })
     }
 
-    func play(_ song: Song, queue: [Song], repository: LibraryRepository) async {
+    func play(_ song: Song, queue: [Song], repository: LibraryRepository, shuffle: Bool = false) async {
         let hidden = HiddenTrackPolicy.ids(UserDefaults.standard.string(forKey:"hiddenTrackIDs") ?? "")
-        playbackQueue.replace(queue.filter { !HiddenTrackPolicy.contains($0,in:hidden) || $0.id == song.id }, selected: song)
+        let source = queue.filter { !HiddenTrackPolicy.contains($0,in:hidden) || $0.id == song.id }
+        playbackQueue.replace(shuffle ? [song]+source.filter { $0.id != song.id } : source, selected:song)
+        if shuffle { playbackQueue.shuffleUpcoming() }
         await start(song, repository: repository)
     }
 

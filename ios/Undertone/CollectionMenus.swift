@@ -10,14 +10,14 @@ struct PlaylistContextMenu: View {
     private func entries() -> [UnifiedTrack] { TrackCatalog.merged(local:library.songs,remote:pc.tracks,order:playlist.tracks) }
     var body: some View {
         Button("PLAY",systemImage:"play.fill") { play(entries()) }
-        Button("SHUFFLE",systemImage:"shuffle") { play(entries().shuffled()) }
+        Button("SHUFFLE",systemImage:"shuffle") { play(entries(),shuffle:true) }
         Button("DOWNLOAD ORIGINALS",systemImage:"arrow.down.circle") { pc.download(entries().compactMap(\.remote),library:library) }
         Button(personal.state.pins.contains(playlist.id) ? "UNPIN" : "PIN",systemImage:"pin") { personal.togglePin(playlist.id) }
         Button("EDIT PLAYLIST",systemImage:"pencil") { edit() }
         ShareLink(item:MusicLinks.make("playlist",playlist.id)) { Label("SHARE",systemImage:"square.and.arrow.up") }
         Button("DELETE PLAYLIST",systemImage:"trash",role:.destructive) { pc.edit(PCEdit(kind:"delete_playlist",playlist:playlist.id)) }
     }
-    private func play(_ source: [UnifiedTrack]) { if let first = source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
 }
 struct AlbumContextMenu: View {
     @EnvironmentObject private var library: LibraryStore
@@ -28,13 +28,13 @@ struct AlbumContextMenu: View {
     private func entries() -> [UnifiedTrack] { TrackCatalog.merged(local:library.songs.filter { $0.artist + " — " + $0.album == name },remote:pc.albums[name] ?? [],albumOrder:true) }
     var body: some View {
         Button("PLAY",systemImage:"play.fill") { play(entries()) }
-        Button("SHUFFLE",systemImage:"shuffle") { play(entries().shuffled()) }
+        Button("SHUFFLE",systemImage:"shuffle") { play(entries(),shuffle:true) }
         Button("DOWNLOAD ORIGINALS",systemImage:"arrow.down.circle") { pc.download(entries().compactMap(\.remote),library:library) }
         Button(personal.state.albums.contains(name) ? "REMOVE FROM LIBRARY" : "SAVE ALBUM",systemImage:"square.stack") { personal.update { if !$0.albums.insert(name).inserted { $0.albums.remove(name) } } }
         Button(personal.state.pins.contains("album:" + name) ? "UNPIN" : "PIN",systemImage:"pin") { personal.togglePin("album:" + name) }
         ShareLink(item:MusicLinks.make("album",name)) { Label("SHARE",systemImage:"square.and.arrow.up") }
     }
-    private func play(_ source: [UnifiedTrack]) { if let first = source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository) } } }
+    private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }
 }
 struct SharedPlaylistLink: View {
     let playlist: PCPlaylist
@@ -73,7 +73,7 @@ struct AlbumTile: View {
             HStack(spacing:0) {
                 Text(first?.song.artist ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength:0)
-                Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:32,height:44) }.accessibilityLabel("Меню альбома " + name)
+                Menu { AlbumContextMenu(name:name) } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }.accessibilityLabel("Меню альбома " + name)
             }
         }.frame(width:116,alignment:.leading).contextMenu { AlbumContextMenu(name:name) }
     }

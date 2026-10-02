@@ -11,6 +11,8 @@ struct PlaybackQueue {
     var mode: RepeatMode = .off
     private(set) var shuffled = false
     private var unshuffledIDs: [String] = []
+    var originalOrder: [String] { unshuffledIDs }
+    mutating func restoreShuffle(_ enabled: Bool, originalIDs: [String]) { shuffled = enabled; unshuffledIDs = originalIDs }
     var current: Song? { songs.indices.contains(index) ? songs[index] : nil }
     var upcoming: [Song] { Array(songs.dropFirst(index + 1)) }
     mutating func replace(_ source: [Song], selected: Song) {
@@ -81,7 +83,7 @@ struct PlaybackQueue {
 enum LibrarySort: String, CaseIterable, Identifiable, Sendable {
     case title, artist, album, newest
     var id: String { rawValue }
-    var title: String { switch self { case .title: return "Название"; case .artist: return "Исполнитель"; case .album: return "Альбом"; case .newest: return "Недавно добавленные" } }
+    var title: String { switch self { case .title: return "TITLE"; case .artist: return "ARTIST"; case .album: return "ALBUM"; case .newest: return "RECENTLY ADDED" } }
     func sorted(_ songs: [Song]) -> [Song] {
         songs.sorted { a, b in
             if self == .newest && a.addedAt != b.addedAt { return a.addedAt > b.addedAt }
