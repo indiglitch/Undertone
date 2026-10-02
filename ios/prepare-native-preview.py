@@ -24,4 +24,4 @@ tracks = [dict(sync_id=s["syncID"], title=s["title"], artist=s["artist"], album=
 tracks.append(dict(sync_id="ffffffffffffffffffffffffffffffff", title="Far away", artist="Demo Artist", album="Night drive", duration=240, size=songs[0]["size"], format="WAV"))
 (root / "pc-catalog.json").write_text(json.dumps(dict(version=1,tracks=tracks)))
 (root / "pc-collections.json").write_text(json.dumps(dict(collections=dict(likes=[songs[0]["syncID"]], playlists=[dict(id="11111111111111111111111111111111", name="Вечером", tracks=[s["syncID"] for s in songs]+[tracks[-1]["sync_id"]], description="Общий плейлист iPhone и ПК")]), pending=[])))
-(root / "personal-library.json").write_text(json.dumps(dict(likes=[],albums=["Demo Artist — Night drive"],artists=[],pins=[],playlists=[],folders=[],playlistFolders={},recents=[],searches=[])))
+(root / "personal-library.json").write_text(json.dumps(dict(likes=[],albums=["Demo Artist — Night drive"],artists=[],pins=[],playlists=[],folders=[],playlistFolders={},recents=[s["id"] for s in songs],searches=[])))

@@ -87,4 +87,15 @@ final class UnifiedInterfaceTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Demo Artist — Night drive"].exists)
     }
 
+    func testHomeActionsHaveEqualSeparateHitAreas() {
+        let app = fixture()
+        let downloads = app.buttons["openDownloads"], sync = app.buttons["syncLibrary"], add = app.buttons["addHomeFiles"]
+        XCTAssertTrue(sync.waitForExistence(timeout:10))
+        XCTAssertTrue(downloads.isHittable); XCTAssertTrue(add.isHittable)
+        XCTAssertLessThan(downloads.frame.maxX,sync.frame.minX)
+        XCTAssertLessThan(sync.frame.maxX,add.frame.minX)
+        XCTAssertEqual(sync.frame.midX-downloads.frame.midX,add.frame.midX-sync.frame.midX,accuracy:1)
+        XCTAssertFalse(app.buttons["refreshHomePlaylists"].exists)
+    }
+
 }

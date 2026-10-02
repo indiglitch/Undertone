@@ -45,7 +45,7 @@ struct MusicLibraryView: View {
             .modifier(OptionalMusicSearch(query:$query,enabled:externalQuery == nil))
             .refreshable { await pc.migratePlaylists(personal,library:library); await pc.refresh() }
             .toolbar {
-                if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) { NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") } } }
+                if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) { NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") } }.sharedBackgroundVisibility(.hidden) }
 
                 if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) {
                     Menu("LIST ACTIONS",systemImage:"ellipsis") {
@@ -54,7 +54,7 @@ struct MusicLibraryView: View {
                         if let playlist { PlaylistContextMenu(playlist:playlist) { editing = true } }
                         if let album { AlbumContextMenu(name:album) }
                     }
-                } }
+                }.sharedBackgroundVisibility(.hidden) }
             }
             .sheet(isPresented:$editing) { PlaylistEditorView(id:playlistID ?? "",isPC:true) }
             .task(id:refreshKey) { await rebuild() }

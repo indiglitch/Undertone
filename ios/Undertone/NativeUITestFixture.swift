@@ -21,6 +21,7 @@ enum NativeUITestFixture {
         _ = try await storage.catalog(JSONEncoder().encode(PCCatalog(version:1,tracks:tracks)))
         try await storage.save(PCStoredState(collections:PCCollections(likes:[a],playlists:[]),pending:[]))
         var personal = PersonalState(); personal.playlists = [PersonalPlaylist(id:"12345678-1234-1234-1234-123456789abc",name:"Вечером",tracks:[hash,b])]
+        personal.recents = [hash,b,c]
         personal.albums = ["Demo Artist — Night drive"]
         try await PersonalStorage(root:root).save(personal)
         try await PlayerStorage(root:root).save(PlayerSnapshot(ids:[hash,b,c],currentID:hash,repeatMode:"off",position:0.5))

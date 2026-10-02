@@ -45,7 +45,7 @@ struct QueueView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { Button(editMode == .active ? "DONE" : "EDIT") { selecting = false; selected = []; editMode = editMode == .active ? .inactive : .active } }.sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .topBarTrailing) { Button(selecting ? "DONE" : "SELECT") { editMode = .inactive; selecting.toggle(); selected = [] }.padding(.trailing,12) }.sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .topBarTrailing) { Button("CLOSE", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }
+                ToolbarItem(placement: .topBarTrailing) { Button("CLOSE", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }.sharedBackgroundVisibility(.hidden)
             }
         }.modifier(MusicModalScope()).presentationDragIndicator(.visible)
     }

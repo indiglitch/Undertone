@@ -67,7 +67,6 @@ struct RootView: View {
     @State private var tab: MobileTab = .home
     @State private var importer = false
     @State private var expandedPlayer = false
-    @State private var playlistOffset = 0
     @State private var albumOffset = 0
     @State private var homeEntries: [UnifiedTrack] = []
     @Environment(\.scenePhase) private var scenePhase
@@ -123,21 +122,19 @@ NavigationStack {
                         .navigationTitle(item.rawValue)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement:.topBarTrailing) {
-                                NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }.accessibilityIdentifier("openDownloads")
-                            }.sharedBackgroundVisibility(.hidden)
                             if item == .home {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("SYNC", systemImage:"arrow.triangle.2.circlepath") {
-                                        if pc.address.isEmpty { devicePresented = true }
-                                        else { Task { await pc.migratePlaylists(personal,library:library); await pc.refresh() } }
-                                    }.disabled(pc.refreshing).accessibilityIdentifier("syncLibrary").buttonStyle(PressFeedbackStyle())
-                                    .padding(.trailing, 12)
+                                ToolbarItem(placement:.topBarTrailing) {
+                                    HStack(spacing:12) {
+                                        NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }.frame(width:44,height:44).accessibilityIdentifier("openDownloads")
+                                        Button("SYNC",systemImage:"arrow.triangle.2.circlepath") {
+                                            if pc.address.isEmpty { devicePresented = true }
+                                            else { Task { await pc.migratePlaylists(personal,library:library); await pc.refresh() } }
+                                        }.frame(width:44,height:44).disabled(pc.refreshing).accessibilityIdentifier("syncLibrary")
+                                        Button("ADD FILES",systemImage:"plus") { importer = true }.frame(width:44,height:44).disabled(library.importing || pc.downloading != nil).accessibilityIdentifier("addHomeFiles")
+                                    }.labelStyle(.iconOnly).buttonStyle(PressFeedbackStyle()).fixedSize(horizontal:true,vertical:false)
                                 }.sharedBackgroundVisibility(.hidden)
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("ADD FILES", systemImage: "plus") { importer = true }
-                                        .disabled(library.importing || pc.downloading != nil)
-                                }.sharedBackgroundVisibility(.hidden)
+                            } else {
+                                ToolbarItem(placement:.topBarTrailing) { NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }.accessibilityIdentifier("openDownloads") }.sharedBackgroundVisibility(.hidden)
                             }
                         }
                         .toolbar {
@@ -178,28 +175,22 @@ Group {
                 NavigationLink { MusicLibraryView(favoritesOnly:true).navigationTitle("LIKED TRACKS") } label: { homeShortcut("LIKED TRACKS",icon:"heart.fill") }
                 NavigationLink { MusicLibraryView(showRoot:false).navigationTitle("ALL TRACKS") } label: { homeShortcut("ALL TRACKS",icon:"music.note") }
                 Button { devicePresented = true } label: { homeShortcut(pc.address.isEmpty ? "CONNECT PC" : "PC LIBRARY",icon:"desktopcomputer") }
-            }.buttonStyle(PressFeedbackStyle())
-            if !pc.collections.playlists.isEmpty {
-                HStack {
-                    NavigationLink { LibraryHubView(initialFilter:"Плейлисты").navigationTitle("PLAYLISTS") } label: { Text("PLAYLISTS").font(.title3.bold()) }
-                    Spacer()
-                    Button("REFRESH PLAYLISTS",systemImage:"arrow.clockwise") {
-                        guard pc.collections.playlists.count > 3 else { ActionFeedback.failed(); return }
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration:0.3)) { playlistOffset = HomeRotation.next(playlistOffset,count:pc.collections.playlists.count) }
-                    }.labelStyle(.iconOnly).frame(width:44,height:44).accessibilityIdentifier("refreshHomePlaylists")
+                ForEach(pc.collections.playlists.prefix(2)) { playlist in
+                    SharedPlaylistLink(playlist:playlist).frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
                 }
-                VStack(spacing:6) {
-                    ForEach(HomeRotation.page(pc.collections.playlists,offset:playlistOffset)) { playlist in
-                        SharedPlaylistLink(playlist:playlist).frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(8).background(.white.opacity(0.06),in:RoundedRectangle(cornerRadius:12))
-                    }
-                }.id(playlistOffset).transition(.opacity)
-            }
+            }.buttonStyle(PressFeedbackStyle())
             if library.songs.isEmpty && pc.tracks.isEmpty {
                 emptyLibrary
             } else {
-                NavigationLink { RecentListeningView() } label: { sectionHeading("RECENTLY PLAYED",detail:personal.state.recents.isEmpty ? "Недавние добавления" : "VIEW ALL") }.accessibilityIdentifier("openRecentlyPlayed")
-                songList(homeEntries)
-                NavigationLink { AllAlbumsView() } label: { sectionHeading("ALBUMS",detail:"VIEW ALL") }.accessibilityIdentifier("openAllAlbums")
+                NavigationLink { RecentListeningView() } label: { sectionHeading("RECENTLY PLAYED",detail:"VIEW ALL") }.accessibilityIdentifier("openRecentlyPlayed")
+                if homeEntries.isEmpty { Text("Пока ничего не слушали").font(.caption).foregroundStyle(.secondary) } else { songList(homeEntries) }
+                HStack {
+                    NavigationLink { AllAlbumsView() } label: { sectionHeading("ALBUMS",detail:"VIEW ALL") }.accessibilityIdentifier("openAllAlbums")
+                    Button("REFRESH ALBUMS",systemImage:"arrow.clockwise") {
+                        guard albumNames.count > 3 else { ActionFeedback.failed(); return }
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration:0.45)) { albumOffset = HomeRotation.next(albumOffset,count:albumNames.count) }
+                    }.labelStyle(.iconOnly).frame(width:44,height:44).accessibilityIdentifier("refreshHomeAlbums")
+                }
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
                         ForEach(HomeRotation.page(albumNames,offset:albumOffset),id: \.self) { AlbumTile(name:$0) }
@@ -210,7 +201,7 @@ Group {
         }
         .task(id:"\(library.revision)|\(pc.catalogRevision)|\(personal.revision)") {
             let local = library.songs, remote = pc.tracks, recents = personal.state.recents
-            let result = await Task.detached(priority:.userInitiated) { Array(TrackCatalog.merged(local:local,remote:remote,order:recents.isEmpty ? nil : recents,sort:.newest).prefix(8)) }.value
+            let result = await Task.detached(priority:.userInitiated) { Array(TrackCatalog.merged(local:local,remote:remote,order:recents,sort:.newest).prefix(3)) }.value
             if !Task.isCancelled { homeEntries = result }
         }
         .task(id:tab == .home && scenePhase == .active) {
