@@ -4,6 +4,7 @@ import Foundation
 // Explicit XCTest launch argument only; excluded from the SideStore Release executable.
 enum NativeUITestFixture {
     static func prepare() async throws {
+        UserDefaults.standard.set(ProcessInfo.processInfo.environment["UNDERTONE_UI_OFFLINE"] == "1",forKey:"offlineMode")
         let root = LibraryRepository.defaultRoot(), repository = LibraryRepository(root:root)
         try await repository.prepare()
         var wav = Data()

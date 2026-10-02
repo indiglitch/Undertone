@@ -244,7 +244,6 @@ struct PlayerView: View {
     @EnvironmentObject private var personal: PersonalLibrary
     @EnvironmentObject private var pc: PCConnection
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var sharing = ShareCoordinator()
     @State private var queuePresented = false
     @State private var seeking = false
     @State private var seekPosition = 0.0
@@ -282,10 +281,8 @@ struct PlayerView: View {
                     }
                 }
             }
-        }.environmentObject(sharing)
-            .overlay(alignment:.top) { if !queuePresented { AppErrorToast().padding(.horizontal,16).padding(.top,8) } }
+        }.modifier(MusicModalScope(showErrors:!queuePresented))
             .presentationDragIndicator(.visible)
-            .sheet(item: $sharing.payload) { SystemShareSheet(items: $0.items) }
             .sheet(isPresented: $queuePresented) { QueueView() }
     }
     private var trackHeading: some View {

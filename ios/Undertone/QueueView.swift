@@ -42,7 +42,7 @@ struct QueueView: View {
                 ToolbarItem(placement: .topBarLeading) { HStack { EditButton(); Button(selecting ? "Готово" : "Выбрать") { selecting.toggle(); selected = [] } } }
                 ToolbarItem(placement: .topBarTrailing) { Button("Закрыть", systemImage: "xmark") { dismiss() }.labelStyle(.iconOnly) }
             }
-        }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.presentationDragIndicator(.visible)
+        }.modifier(MusicModalScope()).presentationDragIndicator(.visible)
     }
     private func row(_ song: Song) -> some View { UnifiedTrackRow(track:UnifiedTrack(song),action: { Task { await player.selectQueued(song) } }) }
 }

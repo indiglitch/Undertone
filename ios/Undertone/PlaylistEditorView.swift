@@ -54,6 +54,6 @@ struct PlaylistEditorView: View {
                 let data = try await Task.detached { try Data(contentsOf:url) }.value
                 try await CoverStore.shared.install(data,id:coverID); coverRevision += 1
             } catch { personal.error = error.localizedDescription } } }
-        }
+        }.modifier(MusicModalScope())
     }
 }
