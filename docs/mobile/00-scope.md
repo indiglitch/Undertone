@@ -18,7 +18,7 @@ Product contract: personal iOS music player; Windows PC is the paired catalog so
 
 ## Intentionally not applicable
 
-Accounts/profiles/followers/blocking/messages/public playlists/collaboration/social updates/push/tickets/merch: excluded by user. Android, Spotify links/codes/service catalog/market restrictions/Premium entitlement: not an Undertone feature. QR scanner remains the actual paired-PC scanner. No Spotify service APIs or content are used.
+Accounts/profiles/followers/blocking/messages/public playlists/collaboration/social updates/push/tickets/merch: excluded by user. Android, Spotify links/codes/service catalog/market restrictions/Premium entitlement: not an Undertone feature. PC pairing and private music-link scanning remain separate QR workflows. No Spotify service APIs or content are used.
 
 Widget extensions, native gapless/normalization, translated lyrics and video timestamp correspondence require separate actual platform/media support. A switch with no working implementation is unacceptable; these must remain explicit remaining work rather than fake controls.
 
