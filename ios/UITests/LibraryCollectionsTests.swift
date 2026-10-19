@@ -18,7 +18,7 @@ final class LibraryCollectionsTests: XCTestCase {
         let app = fixture()
         for title in ["LIKED TRACKS", "ALL TRACKS", "RECENTLY PLAYED"] {
             app.buttons[title].firstMatch.tap()
-            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier == %@", title)).firstMatch.waitForExistence(timeout: 5))
             XCTAssertTrue(app.staticTexts["Midnight city"].waitForExistence(timeout: 5))
             XCTAssertFalse(app.staticTexts["На iPhone"].exists)
             XCTAssertFalse(app.staticTexts["Скачать и слушать"].exists)
@@ -47,7 +47,7 @@ final class LibraryCollectionsTests: XCTestCase {
         app.buttons["ALL TRACKS"].firstMatch.tap()
         app.buttons["collectionSelect"].tap()
         XCTAssertTrue(app.buttons["Выбрать Midnight city"].waitForExistence(timeout: 5))
-        app.staticTexts["Midnight city"].firstMatch.tap()
+        app.collectionViews["musicCollectionList"].staticTexts["Midnight city"].firstMatch.tap()
         XCTAssertEqual(app.buttons["Выбрать Midnight city"].value as? String, "SELECTED")
         XCTAssertEqual(app.buttons["miniPlayerToggle"].label, "PLAY")
         app.buttons["SELECT ALL"].tap()
@@ -63,7 +63,7 @@ final class LibraryCollectionsTests: XCTestCase {
         app.buttons["PLAYLISTS"].tap()
         app.buttons["Empty Collection"].tap()
         XCTAssertTrue(app.staticTexts["Пока нет треков"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["PLAY"].firstMatch.isEnabled)
+        XCTAssertFalse(app.collectionViews["musicCollectionList"].buttons["PLAY"].firstMatch.isEnabled)
         app.buttons["collectionActions"].tap()
         for title in ["EDIT PLAYLIST", "DELETE PLAYLIST"] { XCTAssertTrue(app.buttons[title].isEnabled) }
         XCTAssertFalse(app.buttons["DOWNLOAD PLAYLIST"].exists)
@@ -80,7 +80,7 @@ final class LibraryCollectionsTests: XCTestCase {
         let name = app.textFields["Название"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
         name.tap(); name.typeText("Library UX")
-        app.buttons["CREATE PLAYLIST"].tap()
+        app.buttons["createPlaylistSubmit"].tap()
         let created = app.buttons["Library UX"].firstMatch
         XCTAssertTrue(created.waitForExistence(timeout: 5)); created.tap()
         app.buttons["collectionActions"].tap(); app.buttons["EDIT PLAYLIST"].tap()
@@ -104,7 +104,7 @@ final class LibraryCollectionsTests: XCTestCase {
             app.buttons[filter].tap()
             let row = app.buttons[title].firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
-            XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+            XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier == %@", title)).firstMatch.waitForExistence(timeout: 5))
             XCTAssertTrue(app.staticTexts["Midnight city"].waitForExistence(timeout: 5))
             back(app)
         }
@@ -121,7 +121,7 @@ final class LibraryCollectionsTests: XCTestCase {
         XCTAssertLessThanOrEqual(row.frame.maxX, menu.frame.minX)
         let title = row.label
         row.tap()
-        XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars.matching(NSPredicate(format: "identifier == %@", title)).firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["collectionActions"].isHittable)
     }
 }

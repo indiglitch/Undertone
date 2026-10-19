@@ -41,8 +41,8 @@ private struct HomeScrollMemory: ViewModifier {
                 userScrolling = phase == .interacting || phase == .decelerating
             }
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                horizontal ? max(-geometry.contentInsets.leading, geometry.contentOffset.x)
-                    : max(-geometry.contentInsets.top, geometry.contentOffset.y)
+                horizontal ? max(0, geometry.contentOffset.x + geometry.contentInsets.leading)
+                    : max(0, geometry.contentOffset.y + geometry.contentInsets.top)
             } action: { _, value in
                 // Ignore temporary layout changes while pushing / switching tabs.
                 if active && userScrolling { offset = value }

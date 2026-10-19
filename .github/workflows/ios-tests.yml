@@ -26,6 +26,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$IOS_CI_OUTPUT"
+          printf '%s\n' "$GITHUB_SHA" > "$IOS_CI_OUTPUT/source-commit.txt"
+          printf '%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$IOS_CI_OUTPUT/workflow-run-url.txt"
           XCODE_APP=$(python3 - <<'PY'
           import pathlib, re
           apps = [p for p in pathlib.Path('/Applications').glob('Xcode_26*.app')
@@ -86,7 +88,6 @@ jobs:
             -derivedDataPath ios/ci-build -resultBundlePath "$IOS_CI_OUTPUT/Primary.xcresult" \
             -parallel-testing-enabled NO -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
-            -skip-testing:UndertoneTests/LibraryTests/testDownloadQueueTransfersPinnedOriginal \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee "$IOS_CI_OUTPUT/primary-tests.log"
 
@@ -131,7 +132,7 @@ jobs:
             echo 'Primary unit/UI: ${{ steps.primary.outcome }}'
             echo 'Second size smoke: ${{ steps.secondary.outcome }}'
             echo 'Only executed tests are evidence; inspect xcresult for failures/skips.'
-            echo 'Pinned PC networking test excluded: no pairing fixture in this manual UI job.'
+            echo 'Pinned PC networking test reports XCTSkip when pairing fixture is absent; inspect skipped results.'
             echo 'Download ios-simulator-results from this run for logs, results and screenshots.'
           } >> "$GITHUB_STEP_SUMMARY"
 

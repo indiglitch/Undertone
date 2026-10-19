@@ -19,7 +19,7 @@ struct CollectionListStyle: ViewModifier {
     func body(content: Content) -> some View {
         content.listStyle(.plain).scrollContentBackground(.hidden)
             .listSectionSpacing(8)
-            .contentMargins(.bottom, 8, for: .scrollContent)
+            .contentMargins(.bottom, 12, for: .scrollContent)
             .modifier(SoftScrollEdges())
             .environment(\.defaultMinListRowHeight, CollectionLayout.rowHeight)
             .environment(\.defaultMinListHeaderHeight, 28)

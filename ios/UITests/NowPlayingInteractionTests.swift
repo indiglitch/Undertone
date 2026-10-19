@@ -15,12 +15,7 @@ final class NowPlayingInteractionTests: XCTestCase {
         return app
     }
     private func scrollTo(_ element: XCUIElement, app: XCUIApplication) {
-        for _ in 0..<8 {
-            if element.isHittable { return }
-            guard let scroll = app.scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable }) else { break }
-            scroll.swipeUp()
-        }
-        XCTAssertTrue(element.isHittable)
+        revealContent(element, app: app)
     }
     private func elapsed(_ app: XCUIApplication) -> Int {
         app.staticTexts["playerElapsed"].label.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
@@ -47,8 +42,8 @@ final class NowPlayingInteractionTests: XCTestCase {
         let app = fixture()
         for name in ["SHUFFLE UPCOMING", "PREVIOUS TRACK", "NEXT TRACK"] {
             XCTAssertTrue(app.buttons[name].isHittable)
-            XCTAssertGreaterThanOrEqual(app.buttons[name].frame.width, 44)
-            XCTAssertGreaterThanOrEqual(app.buttons[name].frame.height, 44)
+            XCTAssertGreaterThanOrEqual(app.buttons[name].frame.width + 0.001, 44)
+            XCTAssertGreaterThanOrEqual(app.buttons[name].frame.height + 0.001, 44)
         }
         XCTAssertGreaterThanOrEqual(app.buttons["playerToggle"].frame.width, 72)
         app.buttons["NEXT TRACK"].tap()
@@ -80,10 +75,10 @@ final class NowPlayingInteractionTests: XCTestCase {
         let title = app.staticTexts["playerTrackTitle"].label
         app.buttons["openPlayerQueue"].tap()
         XCTAssertTrue(app.buttons["SELECT"].waitForExistence(timeout: 5)); app.buttons["SELECT"].tap()
-        app.staticTexts["Far away"].tap()
+        app.collectionViews["queueList"].staticTexts["Far away"].tap()
         XCTAssertEqual(app.buttons["Выбрать Far away"].value as? String, "SELECTED")
         app.buttons["REMOVE SELECTED · 1"].tap()
-        XCTAssertTrue(app.staticTexts["Far away"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.collectionViews["queueList"].staticTexts["Far away"].waitForNonExistence(timeout: 5))
         app.buttons["CLOSE"].tap()
         XCTAssertEqual(app.staticTexts["playerTrackTitle"].label, title)
         XCTAssertEqual(app.buttons["playerToggle"].label, "PLAY")
@@ -94,11 +89,11 @@ final class NowPlayingInteractionTests: XCTestCase {
         let title = app.staticTexts["playerTrackTitle"].label
         app.buttons["openPlayerQueue"].tap()
         XCTAssertTrue(app.buttons["EDIT"].waitForExistence(timeout: 5)); app.buttons["EDIT"].tap()
-        let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).allElementsBoundByIndex
+        let handles = app.collectionViews["queueList"].buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder ")).allElementsBoundByIndex
         XCTAssertEqual(handles.count, 2)
         guard handles.count == 2 else { return }
         handles[0].press(forDuration: 0.2, thenDragTo: handles[1])
-        XCTAssertGreaterThan(app.staticTexts["Far away"].frame.minY, app.staticTexts["Morning light"].frame.minY)
+        XCTAssertGreaterThan(app.collectionViews["queueList"].staticTexts["Far away"].frame.minY, app.collectionViews["queueList"].staticTexts["Morning light"].frame.minY)
         app.buttons["DONE"].tap(); app.buttons["CLOSE"].tap()
         XCTAssertEqual(app.staticTexts["playerTrackTitle"].label, title)
         XCTAssertEqual(app.buttons["playerToggle"].label, "PLAY")

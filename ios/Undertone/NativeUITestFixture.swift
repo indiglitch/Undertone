@@ -23,6 +23,12 @@ enum NativeUITestFixture {
                                   error: mode == "mixed" ? "Fixture diagnostic: verification failed" : nil)
     }
     static func prepare() async throws {
+        // Each explicit UI fixture starts from the same preferences; a failed
+        // reversible-toggle test must not alter the next test's tab/layout.
+        UserDefaults.standard.set(true, forKey: "createTabVisible")
+        UserDefaults.standard.set(true, forKey: "canvasEnabled")
+        UserDefaults.standard.set(true, forKey: "lyricsPreview")
+        UserDefaults.standard.set(0.0, forKey: "crossfadeSeconds")
         UserDefaults.standard.set(ProcessInfo.processInfo.environment["UNDERTONE_UI_OFFLINE"] == "1",forKey:"offlineMode")
         let root = LibraryRepository.defaultRoot(), repository = LibraryRepository(root:root)
         try await repository.prepare()

@@ -12,6 +12,7 @@ struct MusicModalScope: ViewModifier {
             .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
             .sheet(item:$routes.route) { MusicRouteView(route:$0).environmentObject(routes).environmentObject(sharing) }
             .sheet(item:$routes.code) { MusicCodeView(url:$0.url) }
+            .sheet(item:$routes.information) { TrackInformationSheet(track: $0.track) }
             .modifier(MenuConfirmationScope())
     }
 }

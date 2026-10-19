@@ -2,7 +2,19 @@ import SwiftUI
 import UIKit
 
 struct SharePayload: Identifiable { let id = UUID(); let items: [Any] }
-@MainActor final class ShareCoordinator: ObservableObject { @Published var payload: SharePayload? }
+@MainActor final class ShareCoordinator: ObservableObject {
+    @Published var payload: SharePayload?
+    func original(_ song: Song, repository: LibraryRepository) async throws {
+        let export = try await repository.exportOriginal(song)
+        payload = SharePayload(items: [OriginalShareItem(export: export)])
+    }
+}
+private final class OriginalShareItem: NSObject, UIActivityItemSource {
+    let export: OriginalFileExport
+    init(export: OriginalFileExport) { self.export = export; super.init() }
+    func activityViewControllerPlaceholderItem(_ controller: UIActivityViewController) -> Any { export.url }
+    func activityViewController(_ controller: UIActivityViewController, itemForActivityType activityType: UIActivity.ActivityType?) -> Any? { export.url }
+}
 struct SystemShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
@@ -12,7 +24,7 @@ struct ShareOriginalButton: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var share: ShareCoordinator
     let song: Song
-    var body: some View { Button("SHARE ORIGINAL",systemImage:"square.and.arrow.up") { Task { do { share.payload = SharePayload(items:[try await library.repository.fileURL(song)]) } catch { library.error = error.localizedDescription } } } }
+    var body: some View { Button("SHARE ORIGINAL",systemImage:"square.and.arrow.up") { Task { do { try await share.original(song, repository: library.repository) } catch { library.error = error.localizedDescription } } } }
 }
 struct MobileSettingsView: View {
     @EnvironmentObject private var library: LibraryStore

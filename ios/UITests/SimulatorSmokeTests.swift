@@ -22,29 +22,16 @@ final class SimulatorSmokeTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
-    func testScreensTabsBackMiniPlayerQueueAndListBottom() {
+    func testHomeBackTabsAndMiniPlayer() {
         XCTAssertTrue(app.buttons["homeAllTracks"].isHittable)
         capture("01-home")
         app.buttons["homeAllTracks"].tap()
         XCTAssertTrue(app.navigationBars["ALL TRACKS"].waitForExistence(timeout: 5))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(app.buttons["homeAllTracks"].waitForExistence(timeout: 5))
-
         app.tabBars.buttons["SEARCH"].tap()
-        let field = app.textFields["musicSearchField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["musicSearchField"].waitForExistence(timeout: 5))
         capture("02-search-empty")
-        field.tap(); field.typeText("Foundation\n")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        let last = app.buttons["Меню ZZ Foundation 60"].firstMatch
-        for _ in 0..<24 {
-            if last.isHittable && last.frame.maxY <= app.buttons["miniPlayerOpen"].frame.minY { break }
-            app.swipeUp()
-        }
-        XCTAssertTrue(last.isHittable)
-        XCTAssertLessThanOrEqual(last.frame.maxY, app.buttons["miniPlayerOpen"].frame.minY)
-        capture("03-search-list-bottom")
-
         app.tabBars.buttons["LIBRARY"].tap()
         XCTAssertTrue(app.navigationBars["LIBRARY"].waitForExistence(timeout: 5))
         capture("04-library")
@@ -52,7 +39,22 @@ final class SimulatorSmokeTests: XCTestCase {
         XCTAssertTrue(open.isHittable); XCTAssertTrue(toggle.isHittable)
         XCTAssertGreaterThanOrEqual(toggle.frame.height, 44)
         XCTAssertLessThanOrEqual(open.frame.maxX, toggle.frame.minX)
-        open.tap()
+    }
+
+    func testSearchListBottomAboveDock() {
+        app.tabBars.buttons["SEARCH"].tap()
+        let field = app.textFields["musicSearchField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5)); field.tap(); field.typeText("Foundation\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        let last = app.collectionViews["musicSearchList"].buttons["Меню ZZ Foundation 60"].firstMatch
+        revealContent(last, app: app, attempts: 24)
+        XCTAssertLessThanOrEqual(last.frame.maxY, app.buttons["miniPlayerOpen"].frame.minY)
+        capture("03-search-list-bottom")
+    }
+
+    func testPlayerQueueModalRoundTrip() {
+        app.tabBars.buttons["LIBRARY"].tap()
+        app.buttons["miniPlayerOpen"].tap()
         XCTAssertTrue(app.buttons["playerToggle"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["miniPlayerToggle"].isHittable)
         capture("05-now-playing")
@@ -60,8 +62,7 @@ final class SimulatorSmokeTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["QUEUE"].waitForExistence(timeout: 5))
         capture("06-queue-modal")
         app.buttons["CLOSE"].tap()
-        XCTAssertTrue(app.buttons["closePlayer"].waitForExistence(timeout: 5))
-        app.buttons["closePlayer"].tap()
+        XCTAssertTrue(app.buttons["closePlayer"].waitForExistence(timeout: 5)); app.buttons["closePlayer"].tap()
         XCTAssertTrue(app.buttons["miniPlayerOpen"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.tabBars.buttons["LIBRARY"].isSelected)
         capture("07-restored-bottom-bars")

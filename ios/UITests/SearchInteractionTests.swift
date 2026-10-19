@@ -48,7 +48,7 @@ final class SearchInteractionTests: XCTestCase {
         let app = searchApp(historyFixture: true)
         XCTAssertTrue(app.staticTexts["SEARCH HISTORY"].exists)
         XCTAssertTrue(app.buttons["searchHistory_Midnight"].isHittable)
-        XCTAssertFalse(app.buttons["Меню Midnight city"].exists)
+        XCTAssertFalse(app.collectionViews["musicSearchList"].buttons["Меню Midnight city"].exists)
         XCTAssertFalse(app.staticTexts["RESULTS"].exists)
         app.buttons["searchHistory_Midnight"].tap()
         XCTAssertTrue(app.staticTexts["Midnight city"].waitForExistence(timeout: 5))
@@ -100,7 +100,7 @@ final class SearchInteractionTests: XCTestCase {
         app.buttons["clearMusicSearch"].tap()
         field.typeText("Far away\n")
         XCTAssertTrue(app.staticTexts["Far away"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Midnight city"].exists)
+        XCTAssertFalse(app.collectionViews["musicSearchList"].staticTexts["Midnight city"].exists)
         XCTAssertEqual(field.value as? String, "Far away")
     }
 

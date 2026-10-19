@@ -74,7 +74,7 @@ struct LibraryHubView: View {
                         if artists.isEmpty { empty("Нет сохранённых исполнителей", detail: "Открыть исполнителя можно из трека или поиска.") }
                     } header: { heading("ARTISTS · A–Z") }
                 }
-            }.modifier(CollectionListStyle()).scrollDismissesKeyboard(.interactively)
+            }.modifier(CollectionListStyle()).scrollDismissesKeyboard(.interactively).accessibilityIdentifier("libraryHubList")
         }
         .searchable(text: $query, prompt: "Поиск в библиотеке")
         .sheet(isPresented: $creating) { CreateMusicView() }
@@ -100,7 +100,7 @@ struct CreateMusicView: View {
                 Button("CREATE PLAYLIST") {
                     pc.edit(PCEdit(kind:"create_playlist",playlist:UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),name:name.trimmingCharacters(in:.whitespacesAndNewlines)))
                     dismiss()
-                }.disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || name.count > 120)
+                }.disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || name.count > 120).accessibilityIdentifier("createPlaylistSubmit")
             }.modifier(SoftScrollEdges()).navigationTitle("Новый плейлист").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } }
         }.presentationDetents([.medium])

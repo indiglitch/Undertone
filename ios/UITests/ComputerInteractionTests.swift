@@ -9,7 +9,7 @@ final class ComputerInteractionTests: XCTestCase {
         app.launchEnvironment["UNDERTONE_UI_OFFLINE"] = mode == "offline" ? "1" : "0"
         app.launch()
         XCTAssertTrue(app.buttons["homeTools"].waitForExistence(timeout: 15))
-        app.buttons["homeTools"].tap(); app.buttons["COMPUTER"].tap()
+        app.buttons["homeTools"].tap(); app.buttons["homeToolsComputer"].tap()
         XCTAssertTrue(app.staticTexts["computerIdentity"].waitForExistence(timeout: 5))
         return app
     }

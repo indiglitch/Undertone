@@ -90,6 +90,7 @@ struct RootView: View {
         .sheet(item:$sharing.payload) { SystemShareSheet(items:$0.items) }
         .sheet(item:$routes.route) { MusicRouteView(route:$0) }
         .sheet(item:$routes.code) { MusicCodeView(url:$0.url) }
+        .sheet(item:$routes.information) { TrackInformationSheet(track: $0.track) }
         .fileImporter(isPresented: $importer, allowedContentTypes: [.audio], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): Task { await library.importFiles(urls) }
@@ -125,11 +126,11 @@ NavigationStack(path: path(for: item)) {
                             if item == .home {
                                 ToolbarItem(placement:.topBarTrailing) {
                                     HStack(spacing:12) {
-                                        NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") }.frame(width:44,height:44).accessibilityIdentifier("openDownloads")
-                                        Button("SYNC",systemImage:"arrow.triangle.2.circlepath") {
+                                        NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle").frame(width:44,height:44).contentShape(Rectangle()) }.accessibilityIdentifier("openDownloads")
+                                        Button {
                                             if pc.address.isEmpty { devicePresented = true }
                                             else { Task { await pc.migratePlaylists(personal,library:library); await pc.refresh() } }
-                                        }.frame(width:44,height:44).disabled(pc.refreshing).accessibilityIdentifier("syncLibrary")
+                                        } label: { Label("SYNC",systemImage:"arrow.triangle.2.circlepath").frame(width:44,height:44).contentShape(Rectangle()) }.disabled(pc.refreshing).accessibilityIdentifier("syncLibrary")
                                     }.labelStyle(.iconOnly).buttonStyle(PressFeedbackStyle()).fixedSize(horizontal:true,vertical:false)
                                 }.sharedBackgroundVisibility(.hidden)
                             } else {
@@ -142,7 +143,7 @@ NavigationStack(path: path(for: item)) {
                                     NavigationLink { MobileSettingsView() } label: { Label("SETTINGS",systemImage:"gearshape") }
                                     Button("ADD FILES", systemImage: "document.badge.plus") { importer = true }
                                         .disabled(library.importing || pc.downloading != nil).accessibilityIdentifier("addHomeFiles")
-                                    Button("COMPUTER",systemImage:"desktopcomputer") { devicePresented = true }
+                                    Button("COMPUTER",systemImage:"desktopcomputer") { devicePresented = true }.accessibilityIdentifier("homeToolsComputer")
                                 }.accessibilityIdentifier("homeTools").accessibilityHint("Настройки, импорт файлов и подключение компьютера") }
                             }
                         }

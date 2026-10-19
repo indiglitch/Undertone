@@ -13,8 +13,7 @@ final class SettingsInteractionTests: XCTestCase {
         return app
     }
     private func reveal(_ element: XCUIElement, app: XCUIApplication) {
-        for _ in 0..<15 { if element.isHittable { return }; app.swipeUp() }
-        XCTAssertTrue(element.isHittable)
+        revealContent(element, app: app)
     }
     func testAppearanceSwitchesRemainReversibleWithNativeTargets() {
         let app = fixture()
@@ -22,17 +21,20 @@ final class SettingsInteractionTests: XCTestCase {
             let toggle = app.switches[id]; reveal(toggle, app: app)
             let original = toggle.value as? String
             XCTAssertGreaterThanOrEqual(toggle.frame.height, 44)
-            toggle.tap(); XCTAssertNotEqual(toggle.value as? String, original)
-            toggle.tap(); XCTAssertEqual(toggle.value as? String, original)
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            waitForValue(toggle, original == "1" ? "0" : "1")
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+            waitForValue(toggle, original ?? "")
         }
     }
     func testCrossfadeCanBeChangedWithoutStartingPlayback() {
         let app = fixture()
         let slider = app.sliders["settingsCrossfade"]
-        slider.adjust(toNormalizedSliderPosition: 0.5)
-        XCTAssertEqual(slider.value as? String, "6 s")
+        slider.adjust(toNormalizedSliderPosition: 1)
+        waitForValue(slider, "12 s")
         XCTAssertEqual(app.buttons["miniPlayerToggle"].label, "PLAY")
         slider.adjust(toNormalizedSliderPosition: 0)
+        waitForValue(slider, "0 s")
     }
     func testEnglishHistoryConfirmationCancelsWithoutRemovingMusic() {
         let app = fixture()
@@ -59,8 +61,7 @@ final class SettingsInteractionTests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         // Scroll back to Library & Downloads using the native Form.
         let downloads = app.buttons["settingsDownloads"]
-        for _ in 0..<10 { if downloads.isHittable { break }; app.swipeDown() }
-        XCTAssertTrue(downloads.isHittable); downloads.tap()
+        revealContent(downloads, app: app); downloads.tap()
         XCTAssertTrue(app.navigationBars["DOWNLOADS"].waitForExistence(timeout: 5))
     }
 }

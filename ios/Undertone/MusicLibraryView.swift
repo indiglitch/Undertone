@@ -53,7 +53,7 @@ struct MusicLibraryView: View {
                 }.modifier(CollectionRowStyle())
             }
             if entries.isEmpty { emptyCollection.modifier(CollectionRowStyle()) }
-        }.modifier(CollectionListStyle()).scrollDismissesKeyboard(.interactively)
+        }.modifier(CollectionListStyle()).scrollDismissesKeyboard(.interactively).accessibilityIdentifier("musicCollectionList")
             .navigationBarTitleDisplayMode(.inline)
             .modifier(OptionalMusicSearch(query:$query,enabled:externalQuery == nil))
             .refreshable { await pc.migratePlaylists(personal,library:library); await pc.refresh() }
@@ -61,7 +61,9 @@ struct MusicLibraryView: View {
                 if externalQuery == nil { ToolbarItem(placement:.topBarTrailing) { NavigationLink { DownloadsView() } label: { Label("DOWNLOADS",systemImage:"arrow.down.circle") } }.sharedBackgroundVisibility(.hidden) }
 
                 if externalQuery == nil { ToolbarItem(placement: .topBarTrailing) {
-                    Button(selecting ? "DONE" : "SELECT TRACKS") { selecting.toggle(); selected = [] }
+                    Button { selecting.toggle(); selected = [] } label: {
+                        Image(systemName: selecting ? "checkmark" : "checkmark.circle").frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.accessibilityLabel(selecting ? "DONE" : "SELECT TRACKS")
                         .disabled(entries.isEmpty && !selecting).accessibilityIdentifier("collectionSelect")
                 }.sharedBackgroundVisibility(.hidden) }
             }
@@ -154,7 +156,7 @@ struct MusicLibraryView: View {
                         }
                     }
                 }
-            } label: { Text("SELECTION ACTIONS").frame(minHeight: 44).contentShape(Rectangle()) }.menuOrder(.fixed).disabled(selected.isEmpty)
+            } label: { Text("SELECTION ACTIONS").frame(minHeight: 44).contentShape(Rectangle()) }.buttonStyle(.borderless).menuOrder(.fixed).disabled(selected.isEmpty)
         }
     }
     private func play(_ source: [UnifiedTrack], shuffle: Bool = false) { guard !source.isEmpty, !shuffle || source.count > 1 else { ActionFeedback.failed(); return }; if let first = shuffle ? source.randomElement() : source.first { Task { await player.play(first.song,queue:source.map(\.song),repository:library.repository,shuffle:shuffle) } } }

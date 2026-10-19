@@ -1,6 +1,6 @@
 # Undertone Mobile UX — этапы 1–10
 
-Обновлено: 2026-10-19. Этапы 1–9 реализованы в исходниках; этап 10 завершил доступную локальную QA и точечные исправления. Нативная сборка, XCTest и визуальная приёмка на macOS/iPhone остаются открытыми; полная готовность не заявляется.
+Обновлено: 2026-10-19. Этапы 1–9 реализованы в исходниках; этап 10 завершил доступную локальную QA и точечные исправления. По предоставленному 19.10.2026 артефакту нативная компиляция и 76 unit-тестов подтверждены; общий CI failed (29 UI-сбоев и timeout второго размера). Исправления после анализа ещё не запускались в CI; полная готовность не заявляется.
 
 ## Инварианты
 
@@ -258,3 +258,46 @@ API: [Apple — минимальная высота строк](https://develope
 4. Like, create/rename/delete playlist, сортировка, меню локального/remote/current/unavailable. Отмена каждого destructive confirmation; удаление membership, сохранённой записи альбома и phone copy проверять раздельно на тестовых файлах. Undo/Trash, Share Original/File Info/Track Code.
 5. QR/ручной код/отказ камеры, доступный/недоступный/офлайн ПК, refresh и pending edits. Реальная загрузка/прогресс/установка/завершение/ошибка/Retry/Resume/Cancel, потеря Wi-Fi/сворачивание; история не равна локальным файлам. Подтвердить, что ошибка Downloads доступна после toast.
 6. Все Settings и их сохранение после перезапуска, ru/en и системный Back. Результаты занести здесь со ссылкой на реальный CI run/артефакт или записью устройства/версии ОС; только после этого закрывать пункты нативной приёмки этапов 1–10.
+
+
+## Подтверждённый Simulator CI — анализ артефакта 19.10.2026
+
+Источник: пользовательский `ios-simulator-results.zip`, SHA-256 `a3538d362e6efd52c94b78b61e49dc14365b3ec23b63aec5b901055b8705e56e`. В архиве нет SHA исходников/run URL, поэтому конкретный commit не приписывается. Подробности: [разбор и повторная проверка](ios-ci-analysis-2026-10-19.md). Этот раздел уточняет исторические ограничения предыдущих этапов; новый успешный CI run не заявляется.
+
+- [x] **Подтверждено артефактом:** Xcode 26.6 (17F113), macOS 26.6.2; build-for-testing приложения и обоих targets успешен. iOS 26.5 Simulator: iPhone 16e, unit 76/76 passed; UI 42 passed / 29 failed. Всего primary 118 passed / 29 failed / 0 skipped.
+- [x] **Изучены:** build/primary/secondary logs, экспортированные xcresult summaries и UI-hierarchy attachments, metadata трёх xcresult bundles; screenshots Home/Search/Library/Now Playing/Queue на первом размере и Home/Search/Library/Now Playing на втором, кадры failure recordings. На Windows повторный разбор бинарного object store через xcresulttool невозможен; используются включённые в архив экспорты Xcode.
+- [ ] **Второй размер:** iPhone 16 Pro Max / iOS 26.5 — smoke 0 passed / 1 failed, timeout 120 секунд; 5 screenshot checkpoints. Primary smoke прошёл и дал 7 screenshots. Наличие снимков Pro Max не закрывает его smoke: лог достиг Queue около предела времени и затем прекратился.
+- [ ] **Сеть:** testDownloadQueueTransfersPinnedOriginal явно исключён в команде workflow. Нулевой skipped count не означает, что тест выполнялся. Реальный ПК/QR/передача и физический iPhone этим архивом не подтверждены.
+
+### Исправления после артефакта — ждут повторного CI
+
+| Подтверждённый сбой | Изменение исходников; результат ещё не подтверждён |
+| --- | --- |
+| Home toolbar Downloads измерен как 26 pt вместо 44; заголовок коллекции не виден при широком Select. | Frame/contentShape внутри labels Home Downloads/Sync, Select — иконка 44 pt с прежним accessibility title. Команды и playback не изменены. |
+| Foundation последний menu + 12 pt заходит на границу dock на 0.333 pt. | Общий нижний content margin коллекций 8 → 12 pt; Search получает такой же зазор. Проверка перекрытия не ослаблена; высоты панелей не добавляются в отступы. |
+| Home scroll restoration не выдержал прежнюю позицию. | Сохраняется координата относительно начала контента с учётом contentInsets; прежний predicate точности остаётся. Нужен повтор HomeNavigationTests. |
+| File Info из Menu не открыл ожидаемый экран. | Menu использует Button + существующий RouteCoordinator для Artist/Album/File Info. File Info имеет собственную закрываемую sheet на Root/Player/Queue/route; данные/функции сохранены. |
+| XCUITest находит одинаковые подписи в mini-player, фоне и основном экране, либо hittable-элемент под fixed footer. | Идентификаторы списков и отдельных submit/actions; запросы ограничены foreground collection/queue. revealContent проверяет весь target между nav bar и dock/timeline перед tap. Это устраняет ошибочный target, а не заменяет пользовательское действие. |
+| Settings normalized Slider 0.5 доставил 7 s, а floating-point target width — 43.999999999999986. | Slider проверяет точные endpoints 12/0; switches ждут фактического изменения и нажимаются по native switch. Только геометрия transport допускает 0.001 pt арифметического шума; реальная ошибка 26 pt не допускается. |
+| Полный smoke второго размера занял больше 120 s. | Разделён на Home/Back/tabs, Search list bottom и Player/Queue, без удаления assertions и без увеличения timeout/retry. Все три выполняются на обоих размерах. |
+
+DEBUG fixture начинает каждый явный UI-прогон с одинаковых appearance/crossfade defaults; Release preferences не изменены. Массовое меню получает borderless style внутри List, не меняя обработчиков. Успех удаления saved album, membership, bulk selection, появления Lyrics и confirmation после исправления queries пока открыт — повторить соответствующие UI suites, не считать их исправленными по одному diff.
+
+Warnings старого build: PCDiscovery actor-isolation (будущий Swift 6), лишние await Vorbis, warnings vendor stb_vorbis и отсутствие AppIntents metadata. Они не вызвали текущие 29 UI failures; аудиодвижок, discovery и vendor-код не переписывались.
+
+### Следующий подтверждающий прогон
+
+1. Отправить эти исправления в проверяемую ветку и вручную запустить **iOS Simulator Checks**. Workflow теперь сохраняет source-commit.txt и workflow-run-url.txt, чтобы следующий архив имел точную привязку.
+2. Повторить полный unit/UI набор на primary, особенно ComputerInteractionTests, ContextMenuInteractionTests, LibraryCollectionsTests, SettingsInteractionTests, SearchInteractionTests, NowPlayingInteractionTests, HomeNavigationTests, MobileFoundationTests и UnifiedInterfaceTests. DownloadsInteractionTests и 76 исходных unit уже прошли в старом run, но должны остаться зелёными после новых правок.
+3. На secondary должны пройти все три SimulatorSmokeTests и появиться 7 checkpoint screenshots. Сравнить заголовки, 44 pt targets, нижнюю строку, навигацию и открытие File Info/Lyrics, затем отдельно проверить Dynamic Type/VoiceOver и iOS 26.0 fallback/26.1+.
+4. Не закрывать приёмку этапов 1–10 и не заявлять готовность до нового фактически зелёного run. Pinned-PC тест/реальный iPhone остаются отдельной проверкой.
+
+### Подготовка к повторному CI и Share Original — 19.10.2026
+
+- [x] Проверен текущий diff: исправления после архива сохранены; IPA workflows не изменены. В ContextMenuInteractionTests проверка удаления membership дополнительно ограничена musicCollectionList: мини-плеер вправе продолжать показывать тот же трек. Проверка удаления из плейлиста сохранена.
+- [x] Локально повторно прошли 4 Python-теста выбора Simulator, YAML-проверка manual-only trigger/targets/permissions, bash -n для всех 9 run-шагов и git diff --check. Исходниковая сверка подтвердила сохранение остальных UI test methods и всех 7 screenshot checkpoints в трёх smoke-тестах. Это не выполнение XCTest.
+- [x] Реализован общий iOS-экспорт оригинала из Now Playing и контекстного меню: временная побайтовая копия с именем «Исполнитель — Название.ext», безопасными символами и ограничением длины Unicode. Исходный файл не меняется; встроенные теги/обложка сохраняются копированием всех байтов. Отсутствующие теги не создаются. Буквальное исходное имя ПК модель не хранит; протокол и хранение не менялись. Каждая операция имеет отдельную временную папку, удерживаемую share item до освобождения системного share controller.
+- [ ] Пять новых OriginalFileExportTests: точные байты/хеш синтетического tagged payload и читаемое имя, повторные экспорты/очистка копии, Unicode/безопасные имена/длина, отсутствующий оригинал и недопустимый путь. Добавлены в существующий unit target через sources: Tests, **не запускались**. Save to Files/AirDrop и сохранность тегов в принимающем приложении требуют проверки iPhone.
+- [ ] Новая Swift-компиляция, полный primary XCTest и три secondary smoke по-прежнему не подтверждены. Windows не располагает Xcode/Simulator; положительный результат старой сборки не переносится на новые исходники. Следующий полный iOS Simulator Checks должен включить OriginalFileExportTests; после подтверждения пользователя выполнить commit/push и ручной dispatch на отправленной ветке. Временные QA-данные, xcresult, screenshots и локальные сборки исключить из коммита.
+
+Подтверждение commit/push получено. Перед отправкой удалено старое CLI-исключение pinned-PC теста: теперь полный набор передаётся XCTest, а testDownloadQueueTransfersPinnedOriginal использует уже существующий XCTSkip при отсутствии pairing fixture. Это не подтверждает сеть и не добавляет credentials; skipped должен быть виден в результатах нового run.

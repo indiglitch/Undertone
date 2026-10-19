@@ -52,7 +52,7 @@ struct QueueView: View {
                 }.disabled(selected.isEmpty) }
                 if !player.upcoming.isEmpty { Button("CLEAR UPCOMING", role: .destructive) { player.clearUpcoming() } }
             }
-            .modifier(CollectionListStyle()).background(Color.canvas)
+            .modifier(CollectionListStyle()).background(Color.canvas).accessibilityIdentifier("queueList")
             .environment(\.editMode,$editMode)
             .navigationTitle("QUEUE").navigationBarTitleDisplayMode(.inline)
             .toolbar {

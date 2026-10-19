@@ -3,9 +3,11 @@ import CoreImage.CIFilterBuiltins
 
 struct MusicRoute: Identifiable { let id = UUID(); let kind: String; let value: String }
 struct CodeRoute: Identifiable { let id = UUID(); let url: URL }
+struct TrackInformationRoute: Identifiable { let id = UUID(); let track: UnifiedTrack }
 @MainActor final class RouteCoordinator: ObservableObject {
     @Published var route: MusicRoute?
     @Published var code: CodeRoute?
+    @Published var information: TrackInformationRoute?
     @Published var error: String?
     func open(_ url: URL) {
         guard let parsed = MusicLinks.parse(url) else { error = "Этот код не является ссылкой Undertone."; return }
@@ -23,6 +25,7 @@ enum MusicLinks {
     }
 }
 struct MusicRouteView: View {
+    @EnvironmentObject private var routes: RouteCoordinator
     @EnvironmentObject private var personal: PersonalLibrary
     @EnvironmentObject private var pc: PCConnection
     @Environment(\.dismiss) private var dismiss
@@ -40,6 +43,7 @@ struct MusicRouteView: View {
                 }
             }.overlay(alignment:.top) { AppErrorToast().padding(.horizontal,16).padding(.top,8) }.toolbar { ToolbarItem(placement:.topBarTrailing) { Button("CLOSE") { dismiss() } } }
         }.modifier(MenuConfirmationScope())
+            .sheet(item: $routes.information) { TrackInformationSheet(track: $0.track) }
     }
 }
 struct MusicCodeView: View {

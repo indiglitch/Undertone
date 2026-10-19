@@ -18,7 +18,7 @@ final class ContextMenuInteractionTests: XCTestCase {
         XCTAssertTrue(app.buttons["Меню " + text].firstMatch.waitForExistence(timeout: 5))
     }
     private func open(_ title: String, app: XCUIApplication) {
-        let menu = app.buttons["Меню " + title].firstMatch
+        let menu = app.collectionViews.buttons.matching(NSPredicate(format: "label == %@", "Меню " + title)).firstMatch
         XCTAssertTrue(menu.waitForExistence(timeout: 5)); menu.tap()
         XCTAssertTrue(app.buttons["PLAY NEXT"].waitForExistence(timeout: 5))
     }
@@ -44,7 +44,7 @@ final class ContextMenuInteractionTests: XCTestCase {
         app.buttons["FILE INFO"].tap()
         XCTAssertTrue(app.navigationBars["FILE INFO"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["На iPhone"].exists)
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["closeTrackInformation"].tap()
         open("Midnight city", app: app); app.buttons["TRACK CODE"].tap()
         XCTAssertTrue(app.staticTexts["Код Undertone"].waitForExistence(timeout: 5))
         app.buttons["CLOSE"].tap()
@@ -91,11 +91,11 @@ final class ContextMenuInteractionTests: XCTestCase {
         app.tabBars.buttons["LIBRARY"].tap(); app.buttons["PLAYLISTS"].tap()
         app.buttons["Вечером"].firstMatch.tap()
         open("Midnight city", app: app); app.buttons["REMOVE FROM PLAYLIST"].tap(); cancelAlert(app)
-        XCTAssertTrue(app.staticTexts["Midnight city"].exists)
+        XCTAssertTrue(app.collectionViews["musicCollectionList"].staticTexts["Midnight city"].exists)
         open("Midnight city", app: app); app.buttons["REMOVE FROM PLAYLIST"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
         app.alerts.buttons["REMOVE FROM PLAYLIST"].tap()
-        XCTAssertTrue(app.staticTexts["Midnight city"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.collectionViews["musicCollectionList"].staticTexts["Midnight city"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["miniPlayerOpen"].exists)
         search("Midnight city", app: app); open("Midnight city", app: app)
         XCTAssertTrue(app.buttons["REMOVE PHONE COPY"].exists)
@@ -120,7 +120,7 @@ final class ContextMenuInteractionTests: XCTestCase {
         app.buttons["REMOVE FROM LIBRARY"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5))
         app.alerts.buttons["REMOVE FROM LIBRARY"].tap()
-        XCTAssertTrue(menu.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.collectionViews["libraryHubList"].buttons["Меню Demo Artist — Night drive"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["miniPlayerOpen"].exists)
         search("Midnight city", app: app); open("Midnight city", app: app)
         XCTAssertTrue(app.buttons["REMOVE PHONE COPY"].exists)
@@ -142,7 +142,7 @@ final class ContextMenuInteractionTests: XCTestCase {
     func testLongPressMenuAndPlayerMenuUseSameActions() {
         let app = fixture()
         search("Midnight city", app: app)
-        app.staticTexts["Midnight city"].firstMatch.press(forDuration: 1)
+        app.collectionViews["musicSearchList"].staticTexts["Midnight city"].firstMatch.press(forDuration: 1)
         XCTAssertTrue(app.buttons["PLAY NEXT"].waitForExistence(timeout: 5))
         app.buttons["TRACK CODE"].tap()
         XCTAssertTrue(app.staticTexts["Код Undertone"].waitForExistence(timeout: 5)); app.buttons["CLOSE"].tap()

@@ -129,10 +129,10 @@ struct TrackContextMenu: View {
         if !track.song.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !track.song.album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             MusicMenuSection(group: .related) {
                 if !track.song.artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    NavigationLink { MusicLibraryView(artist:track.song.artist).navigationTitle(track.song.artist) } label: { Label("GO TO ARTIST",systemImage:"person") }
+                    Button("GO TO ARTIST", systemImage: "person") { routes.route = MusicRoute(kind: "artist", value: track.song.artist) }
                 }
                 if !track.song.album.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    NavigationLink { MusicLibraryView(album:track.song.artist + " — " + track.song.album).navigationTitle(track.song.album) } label: { Label("GO TO ALBUM",systemImage:"square.stack") }
+                    Button("GO TO ALBUM", systemImage: "square.stack") { routes.route = MusicRoute(kind: "album", value: track.song.artist + " — " + track.song.album) }
                 }
             }
         }
@@ -142,10 +142,10 @@ struct TrackContextMenu: View {
                 if offline { Text("Для доступа к оригиналу выключи офлайн-режим и подключи ПК.") }
             }
             Button("SHARE ORIGINAL",systemImage:"square.and.arrow.up") { Task {
-                do { let song = try await pc.resolve(track.song,library:library); sharing.payload = SharePayload(items:[try await library.repository.fileURL(song)]) }
+                do { let song = try await pc.resolve(track.song,library:library); try await sharing.original(song, repository: library.repository) }
                 catch { player.error = "Не удалось открыть оригинал." }
             } }.disabled(track.local == nil && offline)
-            NavigationLink { TrackInformation(track:track) } label: { Label("FILE INFO",systemImage:"info.circle") }
+            Button("FILE INFO", systemImage: "info.circle") { routes.information = TrackInformationRoute(track: track) }
             Button("TRACK CODE",systemImage:"qrcode") { routes.code = CodeRoute(url:MusicLinks.make("track",syncID)) }
             Button(isHidden ? "SHOW TRACK" : "HIDE FROM QUEUE",systemImage:isHidden ? "eye" : "eye.slash") { hidden = HiddenTrackPolicy.toggled(hidden,aliases:track.aliases) }
         }
@@ -181,5 +181,16 @@ struct TrackInformation: View {
             LabeledContent("Размер",value:ByteCountFormatter.string(fromByteCount:track.song.size,countStyle:.file))
             LabeledContent("Доступность",value:track.local == nil ? "На компьютере" : "На iPhone")
         }.modifier(SoftScrollEdges()).navigationTitle("FILE INFO")
+    }
+}
+struct TrackInformationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let track: UnifiedTrack
+    var body: some View {
+        NavigationStack {
+            TrackInformation(track: track).toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("CLOSE") { dismiss() }.accessibilityIdentifier("closeTrackInformation") }
+            }
+        }.presentationDragIndicator(.visible)
     }
 }

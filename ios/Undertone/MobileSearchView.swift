@@ -40,6 +40,8 @@ struct MobileSearchView: View {
                     }
                 }
                 .listStyle(.plain).modifier(SoftScrollEdges()).scrollContentBackground(.hidden)
+                .contentMargins(.bottom, 12, for: .scrollContent)
+                .accessibilityIdentifier("musicSearchList")
                 .scrollDismissesKeyboard(.interactively)
                 // A new query/filter starts at the first result. Back, focus,
                 // playback ticks and tab switches don't reset this list.
