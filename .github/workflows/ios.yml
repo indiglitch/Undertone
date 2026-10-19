@@ -1,6 +1,15 @@
 name: Build iPhone IPA for SideStore
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Build mode
+        type: choice
+        required: true
+        default: IPA Only
+        options:
+          - IPA Only
+          - Build + Tests
   push:
     branches: ['codex/ios-companion']
     paths: ['ios/**', '.github/workflows/ios.yml']
@@ -27,6 +36,7 @@ jobs:
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
       - name: Boot iPhone simulator before networking tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests' }}
         timeout-minutes: 8
         shell: bash
         run: |
@@ -39,6 +49,7 @@ jobs:
           open -a Simulator --args -CurrentDeviceUDID "$DEVICE"
           xcrun simctl bootstatus "$DEVICE" -b
       - name: Start real PC networking fixture
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests' }}
         run: |
           cargo build --manifest-path phone-sync/Cargo.toml
           python3 scripts/prepare-ios-network-test.py
@@ -48,16 +59,18 @@ jobs:
           cd ios
           xcodegen generate
       - name: Run persistence and original-file tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests' }}
         shell: bash
         run: |
           set -euo pipefail
           xcodebuild build-for-testing -project ios/Undertone.xcodeproj -scheme Undertone -destination 'generic/platform=iOS Simulator' ARCHS="$(uname -m)" -derivedDataPath ios/test-build CODE_SIGNING_ALLOWED=NO
           xcodebuild test-without-building -project ios/Undertone.xcodeproj -scheme Undertone -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" -parallel-testing-enabled NO -test-timeouts-enabled YES -maximum-test-execution-time-allowance 120 -default-test-execution-time-allowance 90 -derivedDataPath ios/test-build -resultBundlePath ios/TestResults.xcresult CODE_SIGNING_ALLOWED=NO
       - name: Collect native network diagnostics
-        if: always()
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests') }}
         run: |
           find /var/folders -path '*undertone-ios-network-*/server.log' -exec cat {} \; 2>/dev/null || true
       - name: Capture native Liquid Glass screen
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -93,12 +106,13 @@ jobs:
           path: ios/Undertone-SideStore.ipa
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests' }}
         with:
           name: iPhone-native-preview
           path: ios/native-preview/*.png
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.mode == 'Build + Tests') }}
         with:
           name: iOS-test-results
           path: ios/TestResults.xcresult
