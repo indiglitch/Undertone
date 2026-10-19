@@ -45,6 +45,8 @@ pub struct ExternalLyricsResult {
     pub cached: bool,
     pub retry_after: Option<i64>,
     pub rate_limited: bool,
+    pub error_kind: Option<String>,
+    pub retry_delay_seconds: Option<u64>,
 }
 
 pub fn fetch(
@@ -52,13 +54,10 @@ pub fn fetch(
     track_id: i64,
     provider: &dyn LyricsProvider,
 ) -> Result<ExternalLyricsResult, String> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| e.to_string())?
-        .as_secs() as i64;
-    fetch_at(db, track_id, provider, now)
+    fetch_with_policy(db,track_id,provider,&ExternalLyricsCachePolicy::default())
 }
 
+#[cfg(test)]
 pub(crate) fn fetch_at(
     db: &Database,
     track_id: i64,
@@ -74,6 +73,7 @@ pub(crate) fn fetch_at(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn fetch_at_with_policy(
     db: &Database,
     track_id: i64,
@@ -81,6 +81,18 @@ pub(crate) fn fetch_at_with_policy(
     now: i64,
     policy: &ExternalLyricsCachePolicy,
 ) -> Result<ExternalLyricsResult, String> {
+    fetch_with_recording_clock(db,track_id,provider,now,policy,||Ok(now))
+}
+
+pub(crate) fn fetch_with_policy(db:&Database,track_id:i64,provider:&dyn LyricsProvider,policy:&ExternalLyricsCachePolicy)->Result<ExternalLyricsResult,String>{
+    let now=SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?.as_secs() as i64;
+    fetch_with_recording_clock(db,track_id,provider,now,policy,||{
+        let received=SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e|e.to_string())?;
+        Ok(received.as_secs() as i64+i64::from(received.subsec_nanos()>0))
+    })
+}
+
+fn fetch_with_recording_clock(db:&Database,track_id:i64,provider:&dyn LyricsProvider,now:i64,policy:&ExternalLyricsCachePolicy,received_at:impl FnOnce()->Result<i64,String>)->Result<ExternalLyricsResult,String>{
     let (song, audio_fingerprint) = song_context(db, track_id)?;
     lyrics::refresh_track(db, &song, &audio_fingerprint)?;
 
@@ -89,7 +101,7 @@ pub(crate) fn fetch_at_with_policy(
     }
 
     let lookup = provider.find(&song)?;
-    persist(db, track_id, provider.name(), lookup, now, policy)
+    persist(db, track_id, provider.name(), lookup, received_at()?, policy)
 }
 
 pub(crate) fn needs_lookup_at_with_policy(
@@ -125,6 +137,8 @@ fn cached_at_with_policy(
             cached: true,
             retry_after: None,
             rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
         }));
     }
 
@@ -146,6 +160,8 @@ fn cached_at_with_policy(
                         cached: true,
                         retry_after: None,
                         rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
                     }));
                 }
                 "not_found" if cache_is_fresh(attempted_at, policy.not_found_retry, now) => {
@@ -189,6 +205,8 @@ fn cached_result(status: ExternalLyricsStatus, retry_after: Option<i64>) -> Exte
         cached: true,
         retry_after,
         rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
     }
 }
 
@@ -227,6 +245,8 @@ fn persist(
                     cached: false,
                     retry_after: Some(now + policy.temporary_error_retry.as_secs() as i64),
                     rate_limited: false,
+            error_kind: Some("malformed_response".into()),
+                    retry_delay_seconds: Some(policy.temporary_error_retry.as_secs()),
                 }
             } else {
                 document.origin = LyricsOrigin::External(provider.to_string());
@@ -251,6 +271,8 @@ fn persist(
                         cached: true,
                         retry_after: None,
                         rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
                     });
                 }
                 tx.execute("DELETE FROM lyric_lines WHERE track_id=?1", [track_id])
@@ -268,6 +290,8 @@ fn persist(
                     cached: false,
                     retry_after: None,
                     rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
                 }
             }
         }
@@ -279,6 +303,8 @@ fn persist(
                 cached: false,
                 retry_after: None,
                 rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
             }
         }
         LyricsLookup::Ambiguous => {
@@ -289,11 +315,14 @@ fn persist(
                 cached: false,
                 retry_after: None,
                 rate_limited: false,
+            error_kind: None,
+            retry_delay_seconds: None,
             }
         }
         LyricsLookup::TemporaryError {
             retry_after_seconds,
             rate_limited,
+            reason,
         } => {
             let delay = retry_after_seconds
                 .unwrap_or(policy.temporary_error_retry.as_secs())
@@ -312,6 +341,8 @@ fn persist(
                 cached: false,
                 retry_after: Some(now + delay),
                 rate_limited,
+                error_kind: Some(reason.to_owned()),
+                retry_delay_seconds: Some(delay as u64),
             }
         }
     };

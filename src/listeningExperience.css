@@ -1,0 +1,8 @@
+/* Structural desktop adaptation of the native Home / Library / Player flows. */
+.primary-navigation { display: grid; gap: 4px; }
+.collection-tabs { display: flex; gap: 6px; flex-shrink: 0; margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
+.collection-tabs button { min-height: 40px; padding: 0 16px; border-radius: 999px; color: var(--text-secondary); background: #ffffff05; font-size: clamp(13px,.7vw,15px); white-space: nowrap; }
+.collection-tabs button[aria-current=page] { background: var(--accent-violet); color: #130c20; }
+.collection-actions { flex-shrink: 0; }
+.collection-actions .library-toolbar { padding: 0; margin: 0 0 12px; min-height: 40px; background: transparent; border: 0; box-shadow: none; }
+.collection-actions .library-toolbar select { background: #ffffff06; border-color: #ffffff0c; color: var(--text-secondary); }

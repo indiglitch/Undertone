@@ -11,111 +11,6 @@ pub type TrackId = i64;
 #[cfg(feature = "ai")]
 pub type ProviderFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'a>>;
 
-/// Blocking backend contract; desktop callers must use spawn_blocking.
-pub trait SearchProvider: Send + Sync {
-    fn search(&self, query: &str) -> Result<SoulseekSearchResults, String>;
-}
-
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SearchSource {
-    Soulseek,
-}
-
-/// Remote strings are untrusted opaque identifiers, never local filesystem paths or HTML.
-#[derive(Debug, serde::Serialize)]
-pub struct SoulseekSearchResult {
-    pub source: SearchSource,
-    pub search_id: String,
-    pub username: String,
-    pub remote_path: String,
-    pub size_bytes: u64,
-    pub extension: Option<String>,
-    pub bitrate_kbps: Option<u32>,
-    pub sample_rate_hz: Option<u32>,
-    pub bit_depth: Option<u32>,
-    pub duration_seconds: Option<u32>,
-    pub has_free_upload_slot: Option<bool>,
-    pub queue_length: Option<u64>,
-    pub upload_speed_bytes_per_second: Option<u32>,
-    pub is_locked: bool,
-}
-
-#[derive(Debug, serde::Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum SearchCompletion {
-    Complete,
-    TimedOut,
-    ResultLimit,
-}
-
-#[derive(Debug, serde::Serialize)]
-pub struct SoulseekSearchResults {
-    pub search_id: String,
-    pub completion: SearchCompletion,
-    pub results: Vec<SoulseekSearchResult>,
-    /// Cleanup is bounded and best effort, including when slskd disconnects.
-    pub cleanup_succeeded: bool,
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct SoulseekDownloadRequest {
-    pub username: String,
-    pub remote_path: String,
-    pub size_bytes: u64,
-}
-
-#[derive(Debug, serde::Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum DownloadState {
-    Queued,
-    Downloading,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-#[derive(Debug, serde::Serialize)]
-pub struct DownloadStatus {
-    pub operation_id: String,
-    pub transfer_id: String,
-    pub state: DownloadState,
-    pub downloaded_bytes: u64,
-    pub total_bytes: u64,
-    pub progress: f64,
-    pub speed_bytes_per_second: f64,
-    pub eta_seconds: Option<u64>,
-    pub source_username: String,
-    pub remote_path: String,
-    pub local_path: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum DownloadFinalizeState {
-    Imported,
-    AlreadyInLibrary,
-    FileNotFound,
-    Ambiguous,
-    InvalidFile,
-    ImportFailed,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Clone)]
-pub struct DownloadFinalizeResult {
-    pub operation_id: String,
-    pub status: DownloadFinalizeState,
-    pub track_id: Option<TrackId>,
-    pub local_path: Option<String>,
-}
-
-/// Blocking backend contract; desktop callers must use spawn_blocking.
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-pub trait DownloadProvider: Send + Sync {
-    fn start_download(&self, request: SoulseekDownloadRequest) -> Result<DownloadStatus, String>;
-    fn download_status(&self, operation_id: &str) -> Result<DownloadStatus, String>;
-    fn cancel_download(&self, operation_id: &str) -> Result<DownloadStatus, String>;
-}
 pub trait MetadataProvider: Send + Sync {
     fn read(&self, path: &Path, cover_cache: &Path) -> Result<Metadata, String>;
 }
@@ -158,6 +53,7 @@ pub enum LyricsLookup {
     TemporaryError {
         retry_after_seconds: Option<u64>,
         rate_limited: bool,
+        reason: &'static str,
     },
 }
 impl LyricsDocument {
@@ -227,14 +123,6 @@ pub trait RecommendationEngine: Send + Sync {
     /// Reads persisted features/likes/history; does not invoke an LLM per playlist.
     fn rank(&self, query: &RecommendationQuery) -> Result<Vec<RankedTrack>, String>;
 }
-/// SQLite/config may hold this opaque reference; never the credential itself.
-pub struct SecretRef(pub String);
-pub trait SecretStore: Send + Sync {
-    fn get(&self, key: &SecretRef) -> Result<Option<Vec<u8>>, String>;
-    fn put(&self, key: &SecretRef, value: &[u8]) -> Result<(), String>;
-    fn remove(&self, key: &SecretRef) -> Result<(), String>;
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

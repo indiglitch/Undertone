@@ -38,23 +38,20 @@ test('tooltip wrappers preserve existing button activation handlers',()=>{
 });
 
 test('requested contextual help is present in empty states',()=>{
-  assert.match(source('./SoulseekSearchView.tsx'),/Введите запрос для поиска в Soulseek/);
-  assert.match(source('./SoulseekSearchView.tsx'),/Попробуйте сократить запрос/);
   assert.match(source('./BulkLyricsIndexer.tsx'),/Локальные.+кэшированные.+ошибки/);
-  assert.match(source('./DownloadManager.tsx'),/только загрузки текущего сеанса/);
-  assert.match(source('./CollectionView.tsx'),/Очередь пуста.+контекстное меню.+Слушать следующим/);
+  const queue=source('./QueuePage.tsx');assert.match(queue,/Очередь пуста/);assert.match(queue,/Дальше ничего нет/);assert.match(queue,/Добавьте трек, альбом или плейлист в очередь/);assert.match(queue,/Открыть поиск/);
 });
 
 test('key screens share tokens without changing structural layout rules',()=>{
-  const css=source('./uiPolish.css'),app=source('./App.tsx'),tracks=source('./TrackList.tsx');
-  assert.match(css,/--space-1:/);assert.match(css,/--radius-md:/);assert.match(css,/--surface-panel:/);assert.match(css,/--border-subtle:/);
-  assert.match(css,/\.player\{/);assert.match(css,/\.details-panel\{/);assert.match(css,/\.lyrics-indexer-counters div\{/);
-  assert.match(app,/ResizeHandle axis="horizontal"/);assert.match(tracks,/useVirtualizer/);
+  const css=source('./uiPolish.css'),tokens=source('./designTokens.css'),app=source('./App.tsx'),tracks=source('./TrackList.tsx');
+  assert.match(tokens,/--space-1:/);assert.match(tokens,/--radius-md:/);assert.match(tokens,/--surface-panel:/);assert.match(tokens,/--border-subtle:/);
+  assert.match(source('./PlayerPresentation.css'),/background:var\(--surface-secondary\)/);assert.match(source('./NowPlayingPanel.css'),/background:var\(--bg-base\)/);assert.match(source('./LyricsPresentation.css'),/\.lyrics-run-counters dd/);
+  assert.match(app,/ResizeHandle label="Изменить ширину боковой панели"/);assert.match(tracks,/useVirtualizer/);
 });
 
 test('minimum tooltip coverage is wired through shared primitive',()=>{
   const app=source('./App.tsx'),player=source('./player.tsx'),menu=source('./TrackContextMenu.tsx'),tracks=source('./TrackList.tsx');
-  for(const label of ['Поиск музыки','Локальная медиатека','Недавно добавленные треки','Недавно прослушано','Загрузки текущего сеанса','Тексты песен и индексация','Плейлисты','Альбомы','Исполнители'])assert.ok(app.includes(label),label);
+  for(const label of ['Поиск музыки','Локальная медиатека','Недавно добавленные треки','Недавно прослушано','Тексты песен и индексация','Плейлисты','Альбомы','Исполнители'])assert.ok(app.includes(label),label);
   for(const label of ['Предыдущий трек','Следующий трек','Очередь','Текст песни','Громкость'])assert.ok(player.includes(`content="${label}"`),label);
   for(const label of ['Воспроизвести сразу после текущего трека','Добавить в конец очереди','Выбрать плейлист','Переместить файл в папку удалённых песен','Открыть папку с файлом'])assert.ok((menu+source('./ContextMenu.tsx')).includes(label),label);
   assert.match(tracks,/content="Есть текст песни"/);

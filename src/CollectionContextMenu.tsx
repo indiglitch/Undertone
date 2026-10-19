@@ -1,4 +1,5 @@
-import { ListMusic, Pencil, Play, Trash2 } from 'lucide-react';
+import { exportPlaylist } from './playlistExport';
+import { Download, ListMusic, Pencil, Play, Trash2 } from 'lucide-react';
 import type { Playlist, Track } from './types';
 import { ContextMenu, MenuItem, MenuSection, PlaylistSubmenu } from './ContextMenu';
 import type { MenuPoint } from './trackContextMenuModel';
@@ -10,6 +11,6 @@ export default function CollectionContextMenu({target,point,busy,playlists,onPla
   const empty=!target.tracks.length;
   return <ContextMenu point={point} label={`Действия: ${target.title}`} onClose={onClose} onNotice={onNotice}>{run=><>
     <MenuSection label="ВОСПРОИЗВЕДЕНИЕ"><MenuItem icon={<Play size={16}/>} disabled={busy||empty} onClick={()=>void run(onPlay)}>Воспроизвести</MenuItem><MenuItem icon={<Play size={16}/>} disabled={busy||empty} onClick={()=>void run(onPlayNext,'Добавлено следующим')}>Играть следующим</MenuItem><MenuItem icon={<ListMusic size={16}/>} disabled={busy||empty} onClick={()=>void run(onAddToQueue,'Добавлено в очередь')}>Добавить в очередь</MenuItem>{target.kind!=='playlist'&&<PlaylistSubmenu playlists={playlists} disabled={busy||empty} run={run} onSelect={onAddToPlaylist}/>}</MenuSection>
-    {target.kind==='playlist'&&<><MenuSection label="ПЛЕЙЛИСТ"><MenuItem icon={<Pencil size={16}/>} disabled={busy} onClick={()=>void run(onRename)}>Переименовать</MenuItem></MenuSection><MenuSection separated><MenuItem destructive icon={<Trash2 size={16}/>} disabled={busy} onClick={()=>void run(onDelete)}>Удалить</MenuItem></MenuSection></>}
+    {target.kind==='playlist'&&<><MenuSection label="ПЛЕЙЛИСТ"><MenuItem icon={<Pencil size={16}/>} disabled={busy} onClick={()=>void run(onRename)}>Переименовать</MenuItem><MenuItem icon={<Download size={16}/>} disabled={busy} onClick={()=>void run(()=>exportPlaylist(target.playlist,onNotice))}>Экспортировать с аудиофайлами…</MenuItem></MenuSection><MenuSection separated><MenuItem destructive icon={<Trash2 size={16}/>} disabled={busy} onClick={()=>void run(onDelete)}>Удалить</MenuItem></MenuSection></>}
   </>}</ContextMenu>;
 }

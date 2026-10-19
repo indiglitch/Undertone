@@ -1,8 +1,13 @@
 """Retrieve missing Windows license notices from upstream at packaged VCS revisions."""
-import concurrent.futures, json, pathlib, urllib.request
+import concurrent.futures, json, pathlib, urllib.request, sys
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-meta=json.loads((ROOT/'reports/phase-1.5/cargo-metadata-windows.json').read_text())
-missing=set(json.loads((ROOT/'reports/phase-1.5/license-summary.json').read_text())['missing_license_text'])
+report=ROOT/(sys.argv[1] if len(sys.argv)>1 else 'reports/phase-1.5')
+meta=json.loads((report/'cargo-metadata-windows.json').read_text())
+missing=set(json.loads((report/'license-summary.json').read_text())['missing_license_text'])
+if '--windows-runtime' in sys.argv:
+    import csv
+    rows=list(csv.DictReader((report/'license-inventory.csv').open(encoding='utf-8-sig')))
+    missing &= {f"cargo:{row['dependency']}@{row['version']}" for row in rows if row['scope']=='windows-runtime'}
 dest=ROOT/'third-party/upstream-licenses';dest.mkdir(exist_ok=True)
 def fetch(p):
     key=f"cargo:{p['name']}@{p['version']}"

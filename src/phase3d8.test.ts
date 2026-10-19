@@ -17,14 +17,14 @@ test('local Search resolves title, artist, album, Cyrillic and partial queries i
     assert.deepEqual(localTracksForHits(library,localSearchSource(library).searchNow(query)).map(item=>item.id),[id],`synchronous ${query}`);
   }
   const view=readFileSync(new URL('./CollectionView.tsx',import.meta.url),'utf8');
-  assert.match(view,/localTracksForHits\(library\.tracks,searchHits\)/);
-  assert.match(view,/source\.searchNow\(query\)/);
+  assert.match(view,/localTracksForHits\(library\.tracks,searchHits,byId\)/);
+  assert.match(view,/source\.searchAllNow\(/);
   assert.match(view,/<TrackList tracks=\{tracks\}/);
 });
 
 test('empty local query shows no tracks until a query is entered',async()=>{
   assert.deepEqual(localTracksForHits(library,await local('')).map(item=>item.id),[]);
-  assert.match(readFileSync(new URL('./CollectionView.tsx',import.meta.url),'utf8'),/query\.trim\(\)\?'Ничего не найдено[^:]+:'Введите запрос/);
+  assert.equal(localSearchSource(library).searchAllNow('').albums.length,0);
 });
 
 test('the single Search page and Back preserve the query',()=>{
@@ -34,27 +34,14 @@ test('the single Search page and Back preserve the query',()=>{
   assert.equal(state.current.query,'свет');
 });
 
-test('the one persistent Search host keeps local and Soulseek sections on one page with tabs removed',()=>{
-  const app=readFileSync(new URL('./App.tsx',import.meta.url),'utf8'),css=readFileSync(new URL('./styles.css',import.meta.url),'utf8'),view=readFileSync(new URL('./CollectionView.tsx',import.meta.url),'utf8');
-  assert.match(app,/className="search-page-host" hidden=/);
-  assert.match(css,/\.search-page-host\{display:flex;flex:1;min-height:0;overflow:hidden\}/);
-  assert.match(css,/\.unified-search-content\{[^}]*overflow-y:auto/);
-  assert.match(view,/className="unified-search-section unified-search-library"[\s\S]*className="unified-search-section unified-search-soulseek"/);
-  assert.ok(view.indexOf('className="unified-search-section unified-search-library"')<view.indexOf('className="unified-search-section unified-search-soulseek"'));
-  assert.match(view,/localTracksForHits\(library\.tracks,searchHits\)/);
-  assert.doesNotMatch(view,/search-tabs|role="tablist"/);
-  assert.equal((view.match(/<form className="search unified-search-form"/g)||[]).length,1);
-  assert.match(css,/\.soulseek-results\{flex:1;min-height:0;overflow-y:auto;/);
+test('persistent Search keeps one input with local category tabs and local-only results',()=>{
+ const app=readFileSync(new URL('./App.tsx',import.meta.url),'utf8'),search=readFileSync(new URL('./SearchPage.tsx',import.meta.url),'utf8');
+ assert.match(app,/className="search-page-host" hidden=/);
+ assert.equal((search.match(/<SearchInput /g)||[]).length,1);
+ assert.match(search,/Категории локального поиска/);
+ assert.match(search,/search-results-body/);assert.doesNotMatch(search,/search-network-section|SoulseekSearchView/);
+ assert.doesNotMatch(search,/Library.*Soulseek.*tab|SearchTrackRow|SearchAlbumCard/);
 });
-
-test('Enter or the shared Search button is the only remote trigger, with unavailable state below local results',()=>{
-  const view=readFileSync(new URL('./CollectionView.tsx',import.meta.url),'utf8'),remote=readFileSync(new URL('./SoulseekSearchView.tsx',import.meta.url),'utf8');
-  assert.match(view,/onSubmit=\{e=>\{e\.preventDefault\(\);soulseek\.onSearch\(\);\}\}/);
-  assert.match(view,/disabled=\{!query\.trim\(\)\|\|!soulseek\.enabled\|\|!soulseek\.configured\}/);
-  assert.match(remote,/Soulseek unavailable/);
-  assert.doesNotMatch(remote,/<button className="primary-button"/);
-});
-
 test('newly imported track is immediately visible to Recently Added and local Search snapshots',async()=>{
   const imported=track(3,'Новая песня','Группа','Альбом','2026-09-10T00:00:00Z'),snapshot=[...library,imported];
   assert.equal(recentlyAddedTracks(snapshot)[0].id,3);
@@ -65,8 +52,8 @@ test('volume drag uses the isolated immediate action path without remount keys o
   assert.deepEqual(volumeAction(.37),{type:'volume',value:.37});
   const player=readFileSync(new URL('./player.tsx',import.meta.url),'utf8'),view=readFileSync(new URL('./CollectionView.tsx',import.meta.url),'utf8');
   const isolated=player.slice(player.indexOf('const changeVolume='),player.indexOf('const changeVolume=')+700);
-  assert.doesNotMatch(isolated,/setBusy|setStatus/);
-  assert.match(player,/onPointerDown=\{\(\)=>\{volumeDragging\.current=true;\}\}[\s\S]*onChange=\{e=>\{const value=\+e\.target\.value;setDisplayVolume\(value\);void player\.changeVolume\(value\);\}\}/);
-  assert.match(player,/if\(!volumeDragging\.current\)setDisplayVolume\(status\.volume\)/);
+  assert.doesNotMatch(isolated,/setBusy/);assert.match(isolated,/setStatus\(current=>\(\{\.\.\.current,volume:result\.volume\}\)\)/);
+  assert.match(player,/onPointerDown=\{\(\)=>\{volumeDragging\.current=true;\}\}[\s\S]*onChange=\{e=>\{const value=\+e\.target\.value;[\s\S]*?setDisplayVolume\(value\);void player\.changeVolume\(value\);\}\}/);
+  assert.match(player,/if\(!volumeDragging\.current\)\{setDisplayVolume\(status\.volume\)/);
   assert.doesNotMatch(view,/<TrackList key=/);
 });

@@ -16,7 +16,7 @@ test('queue wins over random and missing cursor falls back to first entry',()=>{
 });
 
 test('random fallback selects one playable local track from the whole library',()=>{
-  const tracks=[track(1),track(2),track(3),track(-4,'soulseek://peer/song.flac')];
+  const tracks=[track(1),track(2),track(3),track(-4,'https://example.invalid/song.flac')];
   assert.equal(chooseRandomLocalTrack(tracks,()=>0)?.id,1);
   assert.equal(chooseRandomLocalTrack(tracks,()=>0.999)?.id,3);
   assert.equal(chooseRandomLocalTrack([],()=>0),null);

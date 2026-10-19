@@ -1,15 +1,15 @@
 {
   "name": "undertone",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "preview:ios": "vite --config ios/preview/vite.config.mjs",
     "build": "tsc && vite build",
     "tauri": "tauri",
-    "desktop": "tauri dev --features slskd,external-lyrics",
-    "test:search": "node --test --experimental-strip-types src/soulseekSearch.test.ts",
-    "test:downloads": "node --test --experimental-strip-types src/downloadModel.test.ts",
+    "desktop": "tauri dev --features external-lyrics",
+    "test:search": "node --test --experimental-strip-types src/searchPhase6.test.ts",
     "test:navigation": "node --test --experimental-strip-types src/navigationModel.test.ts",
     "test:playback": "node --test --experimental-strip-types src/playbackModes.test.ts",
     "test:track-context-menu": "node --test --experimental-strip-types src/trackContextMenuModel.test.ts",
@@ -26,8 +26,12 @@
     "test:ui-polish": "node --test --experimental-strip-types src/uiPolish.test.ts",
     "test:phase3d8": "node --test --experimental-strip-types src/phase3d8.test.ts",
     "test:phase3d9": "node --test --experimental-strip-types src/phase3d9.test.ts",
-    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "package": "tauri build --features slskd,external-lyrics"
+    "test": "npm run test:frontend && npm run test:regression && npm run test:backend && npm run test:portable",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-release.ps1",
+    "test:frontend": "node --test --experimental-strip-types src/*.test.ts",
+    "test:regression": "node scripts/frontend-regression.mjs && node scripts/queue-regression.mjs && node scripts/player-regression.mjs",
+    "test:backend": "cargo test --manifest-path src-tauri/Cargo.toml --features external-lyrics",
+    "test:portable": "npm run build && cargo test --manifest-path src-tauri/Cargo.toml --no-default-features --features portable,external-lyrics"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.12",

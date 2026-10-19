@@ -126,18 +126,19 @@ pub fn save(db: &Database, session: PlaybackSession) -> Result<PlaybackSession, 
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|_| safe_error())?;
-    let valid_tracks: HashSet<i64> = tx
-        .prepare("SELECT id,path FROM tracks")
-        .map_err(|_| safe_error())?
-        .query_map([], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(|_| safe_error())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| safe_error())?
-        .into_iter()
-        .filter_map(|(id, path)| Path::new(&path).is_file().then_some(id))
-        .collect();
+    // Saving progress must never touch the filesystem. Missing files are cleaned
+    // when restoring; only the IDs referenced by this snapshot are checked here.
+    let mut valid_tracks = HashSet::new();
+    {
+        let requested: HashSet<i64> = session.entries.iter().map(|entry| entry.track_id)
+            .chain(session.current_track_id).collect();
+        let mut statement = tx.prepare("SELECT EXISTS(SELECT 1 FROM tracks WHERE id=?1)").map_err(|_| safe_error())?;
+        for id in requested {
+            if statement.query_row([id], |row| row.get::<_, bool>(0)).map_err(|_| safe_error())? {
+                valid_tracks.insert(id);
+            }
+        }
+    }
     let mut seen_entries = HashSet::new();
     let entries: Vec<_> = session
         .entries
@@ -156,14 +157,17 @@ pub fn save(db: &Database, session: PlaybackSession) -> Result<PlaybackSession, 
             .iter()
             .any(|entry| entry.entry_id == *id && Some(entry.track_id) == current_track_id)
     });
-    tx.execute("DELETE FROM playback_queue_entries", [])
-        .map_err(|_| safe_error())?;
-    for (order, entry) in entries.iter().enumerate() {
-        tx.execute(
-            "INSERT INTO playback_queue_entries(entry_id,track_id,order_index) VALUES(?1,?2,?3)",
-            params![entry.entry_id, entry.track_id, order as i64],
-        )
-        .map_err(|_| safe_error())?;
+    let previous = tx.prepare("SELECT entry_id,track_id FROM playback_queue_entries ORDER BY order_index")
+        .map_err(|_| safe_error())?.query_map([], |row| Ok(QueueEntry {entry_id:row.get(0)?,track_id:row.get(1)?}))
+        .map_err(|_| safe_error())?.collect::<Result<Vec<_>,_>>().map_err(|_| safe_error())?;
+    if previous != entries {
+        tx.execute("DELETE FROM playback_queue_entries", []).map_err(|_| safe_error())?;
+        for (order, entry) in entries.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO playback_queue_entries(entry_id,track_id,order_index) VALUES(?1,?2,?3)",
+                params![entry.entry_id, entry.track_id, order as i64],
+            ).map_err(|_| safe_error())?;
+        }
     }
     let position = if current_track_id.is_some() {
         session.position_seconds
@@ -176,7 +180,8 @@ pub fn save(db: &Database, session: PlaybackSession) -> Result<PlaybackSession, 
     )
     .map_err(|_| safe_error())?;
     tx.commit().map_err(|_| safe_error())?;
-    load(db)
+    let cursor=current_entry_id.and_then(|id|entries.iter().position(|entry|entry.entry_id==id));
+    Ok(PlaybackSession {entries,current_entry_id,current_track_id,cursor,position_seconds:position})
 }
 
 pub fn playable_track_ids(db: &Database) -> Result<Vec<i64>, String> {
@@ -364,4 +369,18 @@ mod tests {
         .unwrap();
         assert_eq!(load(&fixture.db).unwrap(), updated);
     }
+    #[test]
+    fn saving_position_preserves_queue_rows_without_touching_missing_files() {
+        let fixture = Fixture::new("progress-only");
+        let id = fixture.track("A");
+        let mut session = PlaybackSession { entries: vec![QueueEntry { entry_id: 1, track_id: id }], current_entry_id: Some(1), current_track_id: Some(id), cursor: Some(0), position_seconds: 1.0 };
+        save(&fixture.db, session.clone()).unwrap();
+        let conn = fixture.db.connect().unwrap();
+        conn.execute_batch("CREATE TRIGGER prevent_queue_delete BEFORE DELETE ON playback_queue_entries BEGIN SELECT RAISE(ABORT,'unchanged queue was rewritten'); END;").unwrap();
+        let path: String = conn.query_row("SELECT path FROM tracks WHERE id=?1", [id], |row| row.get(0)).unwrap();
+        std::fs::remove_file(path).unwrap();
+        session.position_seconds = 25.0;
+        assert_eq!(save(&fixture.db, session.clone()).unwrap(), session);
+    }
+
 }

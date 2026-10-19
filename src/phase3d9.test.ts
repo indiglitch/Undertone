@@ -21,17 +21,19 @@ test('removing a source updates folders only and preserves imported tracks',()=>
 
 test('Music folders UI uses the native picker and exposes connected, empty, error, and Remove states',()=>{
   const app=readFileSync(new URL('./App.tsx',import.meta.url),'utf8');
-  for(const text of ['Music folders','Add music folder','Connected','No music folders yet','Remove'])assert.ok(app.includes(text),text);
-  assert.match(app,/open\(\{directory:true,multiple:true,title:'Add music folder'\}\)/);
+  const folders=readFileSync(new URL('./MusicFoldersDialog.tsx',import.meta.url),'utf8');for(const text of ['Папки с музыкой','Добавить папку с музыкой','Подключено','Папки с музыкой ещё не добавлены','Убрать'])assert.ok((app+folders).includes(text),text);
+  assert.match(app,/open\(\{directory:true,multiple:true,title:'Добавить папку с музыкой'\}\)/);
   assert.match(app,/invoke<boolean>\('remove_library_folder',\{folder\}\)/);
-  assert.match(app,/role="alert"/);
+  assert.match(folders,/role="alert"/);
   assert.match(app,/removeLibraryFolderSnapshot\(value,folder\)/);
 });
 
 test('Settings is a full-weight sidebar item with icon and obvious active and hover states',()=>{
   const app=readFileSync(new URL('./App.tsx',import.meta.url),'utf8'),css=readFileSync(new URL('./styles.css',import.meta.url),'utf8');
-  assert.match(app,/settings:\{selected:settingsOpen[^\n]+<SettingsIcon size=\{20\}\/>Settings/);
-  assert.match(app,/id==='settings'\?'settings-nav-item'/);
-  assert.match(css,/\.settings-nav-item:hover:not\(:disabled\)/);
-  assert.match(css,/\.settings-nav-item\.selected/);
+  assert.match(app,/settings:\{selected:settingsOpen[^\n]+<SettingsIcon size=\{19\}\/><span className="nav-text">Настройки/);
+  assert.match(app,/className=\{`settings-nav-item /);
+  const shell=readFileSync(new URL('./desktopLayout.css',import.meta.url),'utf8');
+  assert.match(shell,/\.sidebar button\.ds-button:hover:not\(:disabled\)/);
+  assert.match(shell,/\.sidebar button\.ds-button\.selected/);
+  assert.match(app,/aria-label="Настройки" aria-haspopup="dialog"/);
 });

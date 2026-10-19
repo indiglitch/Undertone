@@ -1,0 +1,1 @@
+stb_vorbis 1.22 from nothings/stb, commit 2c980bb59875b0d32144a71867fbdebb2f77cd20. Original source unchanged. MIT/public-domain dual license in LICENSE. Used for bounded, streaming Ogg Vorbis playback; original audio bytes are retained.

@@ -1,0 +1,47 @@
+/* Sole owner of entity cards and detail geometry; existing PageHeader and virtual grid. */
+.entity-scroll { display:block; flex:1; min-height:0; min-width:0; overflow:auto; contain:strict; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.entity-grid-row { display:grid; align-items:start; gap:var(--space-5); padding:0; }
+.entity-card { position:relative; min-width:0; width:100%; height:308px; background:transparent; border:0; border-radius:var(--radius-md); transition:background-color 120ms; }
+.entity-card:hover { background:var(--state-hover); }
+.entity-card:active { background:var(--state-active); }
+.entity-card .entity-card-open { display:flex; flex-direction:column; gap:0; align-items:stretch; justify-content:flex-start; width:100%; height:100%; min-width:0; padding:0; text-align:left; color:var(--text-primary); background:transparent; border:0; border-radius:var(--radius-md); }
+.entity-card .entity-card-open:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.entity-card-open > strong { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; height:42px; flex:none; margin-top:var(--space-3); font:var(--font-row-title); line-height:21px; }
+.entity-card--playlist .entity-card-open > strong { font-size:clamp(14px,.8vw,16px); }
+.entity-card-open > small { display:block; flex:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%; margin-top:var(--space-1); font:var(--font-secondary); color:var(--text-secondary); }
+.entity-artwork { position:relative; width:100%; aspect-ratio:1; flex:none; border-radius:var(--radius-md); background:var(--surface-secondary); overflow:hidden; border:var(--border-default); }
+.entity-artwork-tile { position:relative; width:100%; height:100%; overflow:hidden; }
+.entity-artwork .cover { width:100%; height:100%; min-width:0; max-width:none; border-radius:0; background:transparent; }
+.entity-artwork .cover img { width:100%; height:100%; object-fit:cover; }
+.entity-artwork-tile[data-artwork-state=loading] img { opacity:0; }
+.entity-artwork-fallback { position:absolute; inset:0; display:grid; place-items:center; color:var(--text-muted); }
+.entity-artwork-fallback svg { width:var(--space-6); height:var(--space-6); stroke-width:1.25; }
+.entity-artwork-tile[data-artwork-state=loading] .entity-artwork-fallback { color:var(--text-secondary); }
+.entity-artwork-mosaic { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(2,minmax(0,1fr)); gap:var(--border-width); height:100%; }
+.entity-kind-badge { position:absolute; left:var(--space-2); bottom:var(--space-2); width:var(--space-6); height:var(--space-6); display:grid; place-items:center; background:var(--surface-raised); border:var(--border-default); border-radius:var(--radius-sm); color:var(--accent-violet); }
+.entity-kind-badge svg { width:var(--icon-sm); height:var(--icon-sm); }
+.entity-artwork--artist { border-radius:var(--radius-pill); }
+.entity-artist-identity { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:var(--space-3); color:var(--text-secondary); }
+.entity-artist-identity > svg { width:var(--space-6); height:var(--space-6); stroke-width:1.25; }
+.entity-artist-identity > span { font:var(--font-page-title); color:var(--accent-violet); }
+.entity-card-actions { position:absolute; top:var(--space-2); right:var(--space-2); display:flex; gap:var(--space-1); opacity:0; pointer-events:none; background:var(--surface-raised); border:var(--border-default); border-radius:var(--radius-md); transition:opacity 120ms; }
+.entity-card:hover .entity-card-actions,.entity-card:focus-within .entity-card-actions { opacity:1; pointer-events:auto; }
+.entity-detail-page > .entity-header,.entity-detail-page > .playlist-filter,.entity-detail-page > .collection-track-area,.entity-detail-page > .entity-tabs,.entity-detail-page > .entity-detail-body { width:100%; max-width:var(--track-list-width); }
+.page-header.entity-header { align-items:center; gap:var(--space-5); flex-wrap:nowrap; margin:0; padding:var(--space-2) 0 var(--space-4); border:0; background:transparent; box-shadow:none; }
+.entity-header .page-header-icon { width:144px; height:144px; flex:0 0 144px; border-radius:var(--radius-md); background:transparent; }
+.entity-header .page-header-copy { min-width:0; }
+.entity-header .entity-eyebrow { display:block; color:var(--text-muted); font:var(--font-metadata); margin-bottom:var(--space-2); }
+.entity-header .page-header-copy > h1 { overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; text-wrap:balance; }
+.entity-header .page-header-copy > p { color:var(--text-secondary); font:var(--font-secondary); overflow-wrap:anywhere; }
+.entity-header .page-header-copy > .entity-description { font:var(--font-secondary); color:var(--text-muted); max-height:60px; overflow:auto; }
+.entity-header .page-header-actions { margin:var(--space-4) 0 0; display:flex; flex-wrap:wrap; gap:var(--space-2); flex-basis:auto; }
+.entity-detail-body { display:flex; flex:1; flex-direction:column; min-height:0; min-width:0; }
+.entity-tabs.ds-tabs { flex:none; align-self:flex-start; width:auto; }
+.entity-detail-page .playlist-filter > small { font:var(--font-metadata); }
+@container (max-width:900px) { .entity-header .page-header-icon { width:112px; height:112px; flex-basis:112px; } .page-header.entity-header { gap:var(--space-4); } }
+@media (hover:none) { .entity-card-actions { opacity:1; pointer-events:auto; } }
+@media (min-width:1600px) { .library-content[data-collection-kind=playlists] .entity-scroll[data-entity-count="4"] { max-width:1024px; } .library-content[data-collection-kind=playlists] .entity-scroll[data-entity-count="4"] .entity-grid-row { column-gap:var(--space-6); } }
+@media (prefers-reduced-motion:reduce) { .entity-card,.entity-card-actions { transition:none; } }
+.entity-sort-controls { display:flex; gap:var(--space-2); align-items:center; }
+.entity-sort-controls select { min-height:var(--control-height); border:var(--border-default); border-radius:var(--radius-sm); padding:0 var(--space-3); background:var(--surface-secondary); color:var(--text-secondary); font:var(--font-metadata); max-width:100%; }
+.entity-sort-controls .icon-button { width:var(--control-height); height:var(--control-height); border-radius:var(--radius-sm); }

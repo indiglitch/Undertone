@@ -62,8 +62,7 @@ src-tauri/
   src/metadata.rs      Lofty и кеш обложек
   src/audio.rs         Один OutputStream и Sink на отдельном потоке
   src/audio_source.rs  Прозрачный bypass / bandlimited SRC, channel mapping
-  src/providers.rs     Контракты metadata, lyrics, AI, embeddings, recommendations, downloads
-  src/services/        Optional desktop-only slskd config (без клиента)
+  src/providers.rs     Контракты metadata, lyrics, AI, embeddings, recommendations
   src/tests.rs         Проверки импорта и аудио
   migrations/          Версионируемая SQL-схема
 ```

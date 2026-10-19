@@ -105,7 +105,6 @@ export function applyCustomColor(root: HTMLElement, color: RgbColor): void {
   const accentLightness = Math.max(.44, Math.min(.72, originalLightness));
   const surfaceScale = Math.min(1, originalLightness / .16);
   const surfaceLightness = (lightness: number) => lightness * surfaceScale;
-  const rgb = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
   const accentBlue = hslToHex(hue - 28, vividness, Math.min(.7, accentLightness + .035));
   const accentViolet = originalLightness >= .34 && originalLightness <= .78
     ? rgbColorToHex(color)

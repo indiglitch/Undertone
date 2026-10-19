@@ -1,0 +1,23 @@
+const {chromium}=require(process.env.PHASE14_PLAYWRIGHT||'playwright');
+const fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.connectOverCDP('http://127.0.0.1:9130');const page=browser.contexts()[0].pages()[0];page.setDefaultTimeout(8000);
+const invoke=(cmd,args={})=>page.evaluate(({cmd,args})=>window.__TAURI_INTERNALS__.invoke(cmd,args),{cmd,args});
+await page.getByRole('button',{name:'Локальная медиатека',exact:true}).waitFor();await page.waitForTimeout(4000);
+const status=await invoke('audio_command',{action:{type:'status'}});assert.equal(status.playing,false);assert.equal(status.id,null);assert(Math.abs(status.volume-.27)<.001);
+const session=await invoke('playback_session');assert(session.current_track_id===null||session.current_track_id===3);
+const result={missingCurrentStartup:{status,currentId:session.current_track_id,position:session.position_seconds,queueEntries:session.entries.length},keyboard:[],bounds:[]};
+result.missingFeedback=await page.locator('[role="alert"],[role="status"]').allTextContents();
+const missing='releases/phase14-qa/fixtures/plain.wav.missing-smoke';if(fs.existsSync(missing))fs.renameSync(missing,'releases/phase14-qa/fixtures/plain.wav');
+await page.getByRole('button',{name:'Локальная медиатека',exact:true}).evaluate(e=>e.click());await page.getByRole('button',{name:'Слушать: Synthetic Song 3 — Synthetic Artist 1',exact:true}).evaluate(e=>e.click());await page.waitForTimeout(500);console.log(await page.evaluate(()=>({current:document.querySelector('.now-playing')?.innerText,buttons:[...document.querySelectorAll('.player button')].map(e=>({name:e.getAttribute('aria-label'),disabled:e.disabled})),alerts:[...document.querySelectorAll('[role="alert"],[role="status"]')].map(e=>e.textContent)})));await page.getByRole('button',{name:'Сейчас играет: Synthetic Song 3',exact:true}).waitFor();await invoke('audio_command',{action:{type:'pause'}});
+await page.getByRole('button',{name:'Сейчас играет: Synthetic Song 3',exact:true}).evaluate(e=>e.click());
+const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setDeviceMetricsOverride',{width:1000,height:700,deviceScaleFactor:2,mobile:false});await page.waitForTimeout(150);
+await page.screenshot({path:'qa-output/phase14-native/minimum-now-playing-200.png'});result.bounds=await page.locator('.np-primary button,.np-primary input').evaluateAll(es=>es.map(e=>({name:e.getAttribute('aria-label'),rect:e.getBoundingClientRect().toJSON()})));
+assert(result.bounds.every(e=>e.rect.bottom<=700&&e.rect.right<=1000&&e.rect.top>=0));
+await page.getByRole('button',{name:'Закрыть Now Playing',exact:true}).evaluate(e=>e.click());await cdp.send('Emulation.clearDeviceMetricsOverride');
+await page.getByRole('button',{name:'Настройки',exact:true}).focus();await page.keyboard.press('Enter');await page.getByRole('dialog',{name:'Настройки',exact:true}).waitFor();
+for(let i=0;i<20;i++){await page.keyboard.press('Tab');result.keyboard.push(await page.evaluate(()=>({name:document.activeElement?.getAttribute('aria-label')||document.activeElement?.textContent,insideDialog:!!document.activeElement?.closest('dialog')})));}
+assert(result.keyboard.every(e=>e.insideDialog));await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog',{name:'Настройки',exact:true}).count(),0);
+await page.keyboard.press('Control+k');assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'Поиск музыки');
+result.unlabelledVisibleButtons=await page.locator('button').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0&&!e.getAttribute('aria-label')&&!e.textContent.trim()).length);assert.equal(result.unlabelledVisibleButtons,0);
+await page.screenshot({path:'qa-output/phase14-native/keyboard-focus.png'});fs.writeFileSync('qa-output/phase14-native/final-native-results.json',JSON.stringify(result,null,2));console.log('PASS missing current / no autoplay / session / volume / minimum controls / keyboard dialog trap / names');process.exit(0);
+})().catch(e=>{console.error(e);process.exit(1)});

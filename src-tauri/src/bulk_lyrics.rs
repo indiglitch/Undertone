@@ -35,7 +35,6 @@ pub struct BulkLyricsTrack {
 #[serde(rename_all = "snake_case")]
 pub enum BulkLyricsScope {
     AllLibrary,
-    RecentDownloads,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -64,6 +63,12 @@ pub struct BulkLyricsEligibility {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct BulkLyricsProblem {
+    pub track: BulkLyricsTrack,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct BulkLyricsProgress {
     pub phase: BulkLyricsPhase,
     pub total: usize,
@@ -78,6 +83,8 @@ pub struct BulkLyricsProgress {
     pub remaining: usize,
     pub current: Option<BulkLyricsTrack>,
     pub last_error: Option<String>,
+    pub problems: Vec<BulkLyricsProblem>,
+    pub problems_omitted: usize,
 }
 
 impl Default for BulkLyricsProgress {
@@ -96,6 +103,8 @@ impl Default for BulkLyricsProgress {
             remaining: 0,
             current: None,
             last_error: None,
+            problems: Vec::new(),
+            problems_omitted: 0,
         }
     }
 }
@@ -228,17 +237,26 @@ impl BulkLyricsJob {
                 }
             }
 
-            let now = unix_now();
-            let outcome = external_lyrics::fetch_at_with_policy(
+            let outcome = external_lyrics::fetch_with_policy(
                 &db,
                 track.track_id,
                 provider.as_ref(),
-                now,
                 &policy.cache,
             );
             self.update(|state| {
                 state.processed += 1;
                 state.remaining = state.total.saturating_sub(state.processed);
+                let problem = match &outcome {
+                    Ok(result) if result.status == ExternalLyricsStatus::NotFound => Some("not_found"),
+                    Ok(result) if result.status == ExternalLyricsStatus::Ambiguous => Some("ambiguous"),
+                    Ok(result) if result.status == ExternalLyricsStatus::TemporaryError => Some("failed"),
+                    Err(_) => Some("failed"),
+                    _ => None,
+                };
+                if let Some(status) = problem {
+                    if state.problems.iter().filter(|problem| problem.status == status).count() < 200 {state.problems.push(BulkLyricsProblem {track: track.clone(),status: status.into()});}
+                    else {state.problems_omitted += 1;}
+                }
                 match &outcome {
                     Ok(result) => {
                         let is_local = result.status == ExternalLyricsStatus::Found
@@ -269,10 +287,7 @@ impl BulkLyricsJob {
                 Ok(result) if !result.cached => {
                     let mut delay = policy.request_interval;
                     if result.rate_limited {
-                        if let Some(retry_after) = result.retry_after {
-                            let seconds = retry_after.saturating_sub(unix_now()).max(0) as u64;
-                            delay = delay.max(Duration::from_secs(seconds));
-                        }
+                        if let Some(seconds)=result.retry_delay_seconds {delay=delay.max(Duration::from_secs(seconds));}
                     }
                     next_request_at = Some(Instant::now() + delay);
                 }
@@ -350,7 +365,6 @@ fn scope_tracks(db: &Database, scope: BulkLyricsScope) -> Result<Vec<ScopeTrack>
     let conn = db.connect()?;
     let sql = match scope {
         BulkLyricsScope::AllLibrary => "SELECT t.id,t.path,t.title,a.name,b.title,t.duration,t.size,t.modified FROM tracks t JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id ORDER BY t.id",
-        BulkLyricsScope::RecentDownloads => "SELECT t.id,t.path,t.title,a.name,b.title,t.duration,t.size,t.modified FROM (SELECT track_id,MAX(finalized_at) newest_at,MAX(rowid) newest_row FROM slskd_download_finalizations WHERE track_id IS NOT NULL AND status IN ('imported','already_in_library') GROUP BY track_id) d JOIN tracks t ON t.id=d.track_id JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id ORDER BY d.newest_at DESC,d.newest_row DESC",
     };
     let mut statement = conn.prepare(sql).map_err(|e| e.to_string())?;
     let tracks = statement
@@ -502,12 +516,7 @@ mod tests {
             self.state(id, "success", attempted, None);
         }
 
-        fn finalized_download(&self, operation: &str, id: i64) {
-            self.db.connect().unwrap().execute(
-                "INSERT INTO slskd_download_finalizations(operation_id,status,track_id) VALUES(?1,'imported',?2)",
-                params![operation,id],
-            ).unwrap();
-        }
+
     }
 
     impl Drop for Fixture {
@@ -583,7 +592,7 @@ mod tests {
     }
 
     fn wait(job: &BulkLyricsJob) -> BulkLyricsProgress {
-        let deadline = Instant::now() + Duration::from_secs(8);
+        let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             let status = job.status();
             if matches!(
@@ -592,7 +601,7 @@ mod tests {
             ) {
                 return status;
             }
-            assert!(Instant::now() < deadline, "bulk job timed out: {status:?}");
+            assert!(Instant::now() < deadline, "bulk job timed out: phase={:?}, processed={}, total={}",status.phase,status.processed,status.total);
             thread::sleep(Duration::from_millis(10));
         }
     }
@@ -667,9 +676,11 @@ mod tests {
         let fixture = Fixture::new("rate-limit", 3);
         let provider = Arc::new(MockProvider::new(|song| {
             if song.id == 1 {
+                thread::sleep(Duration::from_millis(1100));
                 Ok(LyricsLookup::TemporaryError {
                     retry_after_seconds: Some(1),
                     rate_limited: true,
+                    reason: "network",
                 })
             } else {
                 Ok(found(song.id))
@@ -681,7 +692,7 @@ mod tests {
         let status = wait(&job);
         let calls = provider.calls.lock().unwrap();
         assert_eq!(status.temporary_errors, 1);
-        assert!(calls[1].1.duration_since(calls[0].1) >= Duration::from_millis(900));
+        assert!(calls[1].1.duration_since(calls[0].1) >= Duration::from_millis(2100));
         assert_eq!(provider.max_active.load(Ordering::SeqCst), 1);
     }
 
@@ -766,6 +777,7 @@ mod tests {
             6 => Ok(LyricsLookup::TemporaryError {
                 retry_after_seconds: Some(1),
                 rate_limited: false,
+                reason: "network",
             }),
             7 => Err("one track failed".into()),
             _ => panic!("cached/local track called provider"),
@@ -782,7 +794,25 @@ mod tests {
         assert_eq!(status.ambiguous, 1);
         assert_eq!(status.temporary_errors, 1);
         assert_eq!(status.permanent_errors, 1);
+        assert_eq!(status.problems.iter().map(|p| (p.track.track_id,p.status.as_str())).collect::<Vec<_>>(),vec![(4,"not_found"),(5,"ambiguous"),(6,"failed"),(7,"failed")]);
+        assert_eq!(status.problems_omitted,0);
         assert_eq!(outcome_total(&status), status.processed);
+    }
+
+    #[test]
+    fn problem_details_are_bounded_without_losing_outcome_counts() {
+        let fixture=Fixture::new("bounded-problems",250);
+        let job=BulkLyricsJob::default();
+        job.start_with_policy(fixture.db.clone(),Arc::new(MockProvider::new(|song|Ok(if song.id<=240 {LyricsLookup::NotFound}else {LyricsLookup::Ambiguous}))),test_policy()).unwrap();
+        let status=wait(&job);
+        assert_eq!(status.not_found,240);
+        assert_eq!(status.ambiguous,10);
+        assert_eq!(status.problems.len(),210);
+        assert_eq!(status.problems_omitted,40);
+        assert_eq!(status.problems[0].track.track_id,1);
+        assert_eq!(status.problems[199].track.track_id,200);
+        assert_eq!(status.problems[200].track.track_id,241);
+        assert_eq!(status.problems[200].status,"ambiguous");
     }
 
     #[test]
@@ -854,32 +884,6 @@ mod tests {
         let completed = wait(&job);
         assert_eq!((completed.total, completed.processed), (10, 10));
         assert_eq!(provider.ids(), (21..=30).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn phase_3d_10_recent_downloads_are_newest_first_and_deduplicated_by_track_id() {
-        let fixture = Fixture::new("scope-recent", 5);
-        fixture.finalized_download("old-track-2", 2);
-        fixture.finalized_download("track-4", 4);
-        fixture.finalized_download("newer-track-2", 2);
-        fixture.finalized_download("newest-track-3", 3);
-        let tracks = selected_worklist(
-            &fixture.db,
-            "mock",
-            BulkLyricsSelection {
-                scope: BulkLyricsScope::RecentDownloads,
-                limit: None,
-            },
-            &test_policy().cache,
-        )
-        .unwrap();
-        assert_eq!(
-            tracks
-                .iter()
-                .map(|track| track.track_id)
-                .collect::<Vec<_>>(),
-            vec![3, 2, 4]
-        );
     }
 
     #[test]

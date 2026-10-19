@@ -1,0 +1,4 @@
+.fatal-fallback { display:grid; place-items:center; min-height:100dvh; padding:var(--space-6); background:var(--bg-base); color:var(--text-primary); }
+.fatal-fallback > div { max-width:560px; }
+.fatal-fallback h1 { font:var(--font-page-title); }
+.fatal-fallback p { font:var(--font-body); color:var(--text-secondary); margin-block:var(--space-4); }

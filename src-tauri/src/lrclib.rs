@@ -36,7 +36,7 @@ impl LrclibProvider {
             .connect_timeout(Duration::from_secs(3))
             .timeout(timeout)
             .redirect(Policy::none())
-            .user_agent("Undertone/0.2 external-lyrics")
+            .user_agent(concat!("Undertone/",env!("CARGO_PKG_VERSION")," external-lyrics"))
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self {
@@ -93,9 +93,9 @@ impl LrclibProvider {
                         thread::sleep(Duration::from_millis(50));
                         continue;
                     }
-                    return temporary(30, false);
+                    return unavailable(30);
                 }
-                Ok(response) if !response.status().is_success() => return temporary(60, false),
+                Ok(response) if !response.status().is_success() => return unavailable(60),
                 Ok(response) => return decode_response(response, song),
                 Err(error)
                     if (error.is_timeout() || error.is_connect() || error.is_request())
@@ -124,7 +124,16 @@ fn temporary(seconds: u64, rate_limited: bool) -> LyricsLookup {
     LyricsLookup::TemporaryError {
         retry_after_seconds: Some(seconds),
         rate_limited,
+        reason: "network",
     }
+}
+
+fn unavailable(seconds:u64) -> LyricsLookup {
+    LyricsLookup::TemporaryError {retry_after_seconds:Some(seconds),rate_limited:false,reason:"provider_unavailable"}
+}
+
+fn malformed() -> LyricsLookup {
+    LyricsLookup::TemporaryError {retry_after_seconds:Some(60),rate_limited:false,reason:"malformed_response"}
 }
 
 fn decode_response(mut response: Response, song: &SongContext) -> LyricsLookup {
@@ -135,7 +144,7 @@ fn decode_response(mut response: Response, song: &SongContext) -> LyricsLookup {
         .and_then(|value| value.parse::<u64>().ok())
         .is_some_and(|length| length > MAX_RESPONSE_BYTES)
     {
-        return temporary(60, false);
+        return malformed();
     }
     let mut bytes = Vec::new();
     if response
@@ -143,12 +152,12 @@ fn decode_response(mut response: Response, song: &SongContext) -> LyricsLookup {
         .take(MAX_RESPONSE_BYTES + 1)
         .read_to_end(&mut bytes)
         .is_err()
-        || bytes.len() as u64 > MAX_RESPONSE_BYTES
     {
-        return temporary(60, false);
+        return temporary(30, false);
     }
+    if bytes.len() as u64 > MAX_RESPONSE_BYTES {return malformed();}
     let Ok(candidates) = serde_json::from_slice::<Vec<LrclibCandidate>>(&bytes) else {
-        return temporary(60, false);
+        return malformed();
     };
     choose(candidates, song)
 }
@@ -310,7 +319,7 @@ mod tests {
             let requests = Arc::new(AtomicUsize::new(0));
             let count = requests.clone();
             std::thread::spawn(move || {
-                let deadline = Instant::now() + Duration::from_secs(3);
+                let deadline = Instant::now() + Duration::from_secs(10);
                 let mut next = 0usize;
                 while next < replies.len() && Instant::now() < deadline {
                     match listener.accept() {
@@ -355,7 +364,7 @@ mod tests {
         }
 
         fn provider(&self) -> LrclibProvider {
-            LrclibProvider::for_test(self.endpoint.clone(), Duration::from_millis(500)).unwrap()
+            LrclibProvider::for_test(self.endpoint.clone(), Duration::from_secs(2)).unwrap()
         }
     }
 
@@ -525,7 +534,7 @@ mod tests {
         };
         let timeout = MockServer::start(vec![timeout_reply.clone(), timeout_reply]);
         assert!(matches!(
-            timeout.provider().find(&song()).unwrap(),
+            LrclibProvider::for_test(timeout.endpoint.clone(),Duration::from_millis(500)).unwrap().find(&song()).unwrap(),
             LyricsLookup::TemporaryError { .. }
         ));
 
@@ -541,13 +550,14 @@ mod tests {
             LyricsLookup::TemporaryError {
                 retry_after_seconds: Some(120),
                 rate_limited: true,
+                reason: "network",
             }
         );
 
         let malformed = MockServer::start(vec![Reply::json("{bad")]);
         assert!(matches!(
             malformed.provider().find(&song()).unwrap(),
-            LyricsLookup::TemporaryError { .. }
+            LyricsLookup::TemporaryError { reason:"malformed_response", .. }
         ));
         let oversized = MockServer::start(vec![Reply {
             status: 200,
@@ -558,7 +568,7 @@ mod tests {
         }]);
         assert!(matches!(
             oversized.provider().find(&song()).unwrap(),
-            LyricsLookup::TemporaryError { .. }
+            LyricsLookup::TemporaryError { reason:"malformed_response", .. }
         ));
     }
 

@@ -8,3 +8,6 @@ export function Cover({track,size='',className=''}:{track:Track|null;size?:strin
     {track?.cover&&track.cover!==failed?<img draggable={false} src={convertFileSrc(track.cover)} alt={`Обложка ${track.album}`} loading="lazy" onError={()=>setFailed(track.cover)}/>:<Disc3 size={size==='small'?26:54} strokeWidth={1}/>}
   </span>;
 }
+
+export { Button, IconButton, Input, SearchInput, Tabs, Divider } from './primitives';
+export { Tooltip } from './Tooltip';

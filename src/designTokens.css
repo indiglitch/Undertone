@@ -1,0 +1,31 @@
+/* Phase 1: sole owner of shared tokens. Palette variables remain theme inputs. */
+:root {
+  --shell-sidebar-collapsed: 64px; --shell-sidebar-default: 224px; --shell-splitter: 6px; --shell-player-height: 104px;
+  --page-width: 1840px; --table-width: 2048px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 24px; --radius-pill: 999px;
+  --bg-base: #050506; --surface-panel: #100d15; --surface-raised: #202027; --surface-secondary: #09070d;
+  --state-hover: rgba(255,255,255,.07); --state-active: rgba(255,255,255,.12);
+  --state-selected: color-mix(in srgb, var(--accent-violet) 18%, transparent);
+  --border-subtle: #303039; --border-strong: #464657;
+  --text-primary: #eeeaf2; --text-secondary: #ada5bb; --text-muted: #8e869e;
+  --accent-violet: #c18cf5; --danger: #ff788e; --warning: #efc16c; --success: #7edbc1;
+  --focus: var(--accent-violet); --text-on-accent: #150b20;
+  --border-width: 1px; --border-default: var(--border-width) solid var(--border-subtle);
+  --shadow-panel: inset 0 1px 0 rgba(255,255,255,.08), 0 20px 60px rgba(0,0,0,.28);
+  --shadow-card: inset 0 1px 0 rgba(255,255,255,.035), 0 8px 24px rgba(0,0,0,.16);
+  --shadow-card-hover: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px rgba(0,0,0,.24);
+  --shadow-popover: 0 8px 24px rgba(0,0,0,.36);
+  --control-height-sm: 40px; --control-height: 40px; --control-height-lg: 48px;
+  --icon-sm: 16px; --icon-md: 20px; --icon-lg: 24px;
+  --font-ui: 'Segoe UI', system-ui, sans-serif;
+  --font-page-title: 550 28px/1.2 var(--font-ui);
+  --font-section-title: 600 20px/1.3 var(--font-ui);
+  --font-row-title: 600 14px/1.4 var(--font-ui);
+  --font-body: 400 14px/1.5 var(--font-ui);
+  --font-secondary: 400 13px/1.5 var(--font-ui);
+  --font-metadata: 400 12px/1.4 var(--font-ui);
+  --font-caption: 400 11px/1.4 var(--font-ui);
+}
+/* Local track geometry; shared spacing, typography and states remain Phase 1 tokens. */
+:root { --track-artwork-size:32px; --track-list-width:var(--table-width); }

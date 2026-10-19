@@ -1,0 +1,20 @@
+/* Sole owner of Queue composition; TrackList owns rows, drag and virtualization. */
+.queue-page { min-width:0; }
+.queue-page > .queue-now,.queue-page > .queue-upcoming,.queue-page > .queue-empty { width:100%; max-width:var(--track-list-width); min-width:0; }
+.queue-now { flex:none; padding-bottom:var(--space-4); }
+.queue-page h2 { font:var(--font-section-title); margin:0; color:var(--text-primary); }
+.queue-summary { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-3) 0; border-bottom:var(--border-default); }
+.queue-summary > .cover.small { width:64px; height:64px; min-width:64px; border-radius:var(--radius-sm); }
+.queue-summary-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--space-1); }
+.queue-summary-copy strong { font:var(--font-row-title); color:var(--text-primary); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.queue-summary-copy span { font:var(--font-secondary); color:var(--text-secondary); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.queue-summary-copy .queue-source { min-height:0; padding:0; background:transparent; border:0; border-radius:var(--radius-sm); text-align:left; font:var(--font-metadata); color:var(--text-muted); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; width:fit-content; max-width:100%; }
+.queue-source:hover { color:var(--accent-violet); text-decoration:underline; }
+.queue-state { flex:none; display:flex; flex-direction:column; gap:var(--space-1); text-align:right; color:var(--text-secondary); font:var(--font-metadata); font-variant-numeric:tabular-nums; }
+.queue-state small { font:var(--font-caption); color:var(--text-muted); }
+.queue-upcoming { display:flex; flex-direction:column; flex:1; min-height:0; }
+.queue-section-heading { display:flex; align-items:center; gap:var(--space-3); padding-bottom:var(--space-2); flex:none; }
+.queue-section-heading > span { font:var(--font-metadata); color:var(--text-muted); font-variant-numeric:tabular-nums; }
+.queue-empty { flex:none; padding:var(--space-4) 0; }
+.queue-empty > svg { color:var(--text-muted); width:var(--icon-lg); height:var(--icon-lg); margin-bottom:var(--space-2); }
+.queue-empty p { font:var(--font-secondary); color:var(--text-secondary); margin:var(--space-2) 0; }

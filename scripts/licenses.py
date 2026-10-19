@@ -64,7 +64,7 @@ for p in sorted(all_meta['packages'],key=lambda p:(p['name'],p['version'])):
     supplement=DEST/'upstream-licenses'/(p['name']+'-'+p['version'])
     if not files:files=license_files(supplement)
     text='\n\n'.join(f'### {f.name}\n\n'+f.read_text(encoding='utf-8',errors='replace') for f in files)
-    if not files:missing.append('cargo:'+p['name']+'@'+p['version'])
+    if not files and source:missing.append('cargo:'+p['name']+'@'+p['version'])
     concern=risk(lic)
     if not files:concern+='; no standalone upstream license text collected'
     if p['name']=='symphonia-codec-aac':concern+='; separately review AAC patent licensing for product/territories'
@@ -119,7 +119,7 @@ for path,p in npm['packages'].items():
             parent=parent.rsplit('/node_modules/',1)[0] if '/node_modules/' in parent else ''
 with (OUT/'license-inventory.csv').open('w',encoding='utf-8-sig',newline='') as f:
     writer=csv.DictWriter(f,fieldnames=rows[0].keys());writer.writeheader();writer.writerows(rows)
-(DEST/'THIRD_PARTY_NOTICES.md').write_text('\n'.join(notice),encoding='utf-8')
+(DEST/'THIRD_PARTY_NOTICES.md').write_text('\n'.join(line.rstrip() for line in '\n'.join(notice).splitlines())+'\n',encoding='utf-8')
 sbom={'spdxVersion':'SPDX-2.3','dataLicense':'CC0-1.0','SPDXID':'SPDXRef-DOCUMENT','name':'Undertone dependency catalog - locked all-target and build graph','documentNamespace':'https://undertone.local/spdx/'+str(uuid.uuid4()),'creationInfo':{'creators':['Tool: Undertone scripts/licenses.py'],'created':datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')},'packages':packages,'relationships':[{'spdxElementId':'SPDXRef-DOCUMENT','relationshipType':'DESCRIBES','relatedSpdxElement':p['SPDXID']} for p in packages]+edges}
 (DEST/'dependencies.spdx.json').write_text(json.dumps(sbom,indent=2),encoding='utf-8')
 ids={p['SPDXID'] for p in packages}|{'SPDXRef-DOCUMENT'}

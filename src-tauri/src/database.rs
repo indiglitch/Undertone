@@ -60,6 +60,7 @@ pub struct Track {
     pub album_id: i64,
     pub added_at: String,
     pub has_lyrics: bool,
+    pub size_bytes: Option<i64>,
 }
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct TrackMetadataDetails {
@@ -100,10 +101,10 @@ impl Database {
                 include_str!("../migrations/002_identity_and_folders.sql"),
             ),
             (3, include_str!("../migrations/003_collections.sql")),
-            (4, include_str!("../migrations/004_slskd_settings.sql")),
+            (4, include_str!("../migrations/004_retired.sql")),
             (
                 5,
-                include_str!("../migrations/005_slskd_download_finalize.sql"),
+                include_str!("../migrations/005_retired.sql"),
             ),
             (6, include_str!("../migrations/006_lyrics.sql")),
             (7, include_str!("../migrations/007_external_lyrics.sql")),
@@ -141,7 +142,7 @@ impl Database {
     pub fn library(&self) -> Result<Library, String> {
         let conn = self.connect()?;
         // ponytail: metadata-only snapshot is fine for tens of thousands; page IPC if libraries grow beyond that.
-        let mut stmt = conn.prepare("SELECT t.id,t.path,t.title,a.name,b.title,t.album_artist,t.track_number,t.year,t.duration,t.format,t.cover,COALESCE((SELECT group_concat(g.name, ', ') FROM track_genres tg JOIN genres g ON g.id=tg.genre_id WHERE tg.track_id=t.id),''),t.artist_id,t.album_id,t.added_at,l.track_id IS NOT NULL FROM tracks t JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id LEFT JOIN lyrics l ON l.track_id=t.id ORDER BY a.name COLLATE NOCASE,b.title COLLATE NOCASE,t.track_number,t.title COLLATE NOCASE").map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT t.id,t.path,t.title,a.name,b.title,t.album_artist,t.track_number,t.year,t.duration,t.format,t.cover,COALESCE((SELECT group_concat(g.name, ', ') FROM track_genres tg JOIN genres g ON g.id=tg.genre_id WHERE tg.track_id=t.id),''),t.artist_id,t.album_id,t.added_at,l.track_id IS NOT NULL,t.size FROM tracks t JOIN artists a ON a.id=t.artist_id JOIN albums b ON b.id=t.album_id LEFT JOIN lyrics l ON l.track_id=t.id ORDER BY a.name COLLATE NOCASE,b.title COLLATE NOCASE,t.track_number,t.title COLLATE NOCASE").map_err(|e| e.to_string())?;
         let tracks = stmt
             .query_map([], |r| {
                 Ok(Track {
@@ -161,6 +162,7 @@ impl Database {
                     album_id: r.get(13)?,
                     added_at: r.get(14)?,
                     has_lyrics: r.get(15)?,
+                    size_bytes: r.get(16)?,
                 })
             })
             .map_err(|e| e.to_string())?

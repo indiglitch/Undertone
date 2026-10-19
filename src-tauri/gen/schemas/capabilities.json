@@ -1,1 +1,1 @@
-{"main":{"identifier":"main","description":"Local music desktop window","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","updater:default"]}}
+{"main":{"identifier":"main","description":"Local music desktop window","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","dialog:allow-save","updater:default"]}}

@@ -1,0 +1,53 @@
+/* Sole lyrics presentation owner. Parent shell/player geometry stays with its owner. */
+.lyrics-screen { display:flex; flex-direction:column; flex:1; min-height:0; min-width:0; width:100%; max-width:var(--page-width); padding:var(--space-4) var(--page-padding,var(--space-5)); margin-inline:auto; overflow:hidden; gap:var(--space-3); }
+.lyrics-screen > .page-header { flex:none; margin:0; }
+.lyrics-content { position:relative; display:flex; flex:1; min-height:0; min-width:0; }
+.lyrics-scroll { flex:1; min-height:0; min-width:0; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding-inline:var(--space-4); }
+.lyrics-scroll:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; }
+.synced-lyrics { display:flex; flex-direction:column; align-items:stretch; width:100%; max-width:720px; margin-inline:auto; padding-block:var(--lyrics-center-padding,96px); }
+.synced-lyrics button { text-align:left; display:block; width:100%; min-height:var(--control-height-lg); padding:var(--space-2) 0; border:0; border-radius:0; background:transparent; font:500 clamp(20px,2vw,28px)/1.55 var(--font-ui); color:var(--text-muted); transition:color 160ms; overflow-wrap:anywhere; cursor:pointer; transform:none; }
+.synced-lyrics button.active { color:var(--accent-violet); font-weight:600; }
+.synced-lyrics button.nearby { color:var(--text-secondary); }
+.synced-lyrics button:hover { color:var(--text-primary); }
+.synced-lyrics button:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; }
+.synced-lyrics button:disabled { cursor:default; opacity:1; }
+.plain-lyrics { width:100%; max-width:720px; margin:0 auto; padding-block:var(--space-5); white-space:pre-wrap; overflow-wrap:anywhere; font:400 20px/1.65 var(--font-ui); color:var(--text-primary); }
+.lyrics-empty { padding:var(--space-4) 0; max-width:600px; display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-3); font:var(--font-body); color:var(--text-secondary); }
+.lyrics-empty h2 { font:var(--font-section-title); color:var(--text-primary); margin:0; }
+.lyrics-empty p { margin:0; font:var(--font-secondary); }
+.lyrics-empty small,.lyrics-source-badge { font:var(--font-metadata); color:var(--text-muted); }
+.lyrics-content .lyrics-return { position:absolute; right:var(--space-4); bottom:var(--space-3); background:var(--surface-panel); border:var(--border-default); box-shadow:var(--shadow-popover); }
+.lyrics-screen.lyrics-embedded { padding:0; margin:0; width:100%; max-width:none; height:100%; }
+.lyrics-embedded .lyrics-scroll { padding-inline:var(--space-2); }
+.lyrics-embedded .synced-lyrics button { font-size:18px; }
+.lyrics-embedded .plain-lyrics { font-size:16px; }
+
+
+.lyrics-management { display:flex; flex-direction:column; flex:1; gap:clamp(var(--space-4),1.25vw,var(--space-5)); min-height:0; min-width:0; width:100%; max-width:var(--page-width); padding:var(--space-4) var(--page-padding,var(--space-5)); margin-inline:auto; overflow:auto; }
+.lyrics-management[hidden] { display:none; }
+.lyrics-management > .page-header { flex:none; margin:0; }
+.lyrics-management-description { color:var(--text-secondary); font:var(--font-body); margin:0; max-width:85ch; }
+.lyrics-management-actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-5); flex:none; width:100%; max-width:1440px; padding-block:var(--space-3) var(--space-5); border-bottom:var(--border-default); }
+.lyrics-management-actions label { display:flex; align-items:center; gap:var(--space-2); color:var(--text-secondary); font:var(--font-metadata); }
+.lyrics-management-actions select { height:var(--control-height); padding:0 var(--space-2); border:var(--border-default); border-radius:var(--radius-sm); background:var(--surface-secondary); color:var(--text-primary); font:var(--font-secondary); }
+.lyrics-run-progress { flex:none; display:flex; flex-direction:column; gap:var(--space-3); width:100%; max-width:1440px; }
+.lyrics-run-progress > div { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--space-2); color:var(--text-secondary); font:var(--font-secondary); font-variant-numeric:tabular-nums; }
+.lyrics-run-progress strong { color:var(--text-primary); }
+.lyrics-run-progress progress { width:100%; height:var(--space-2); accent-color:var(--accent-violet); }
+.lyrics-current-track { margin:0; color:var(--text-muted); font:var(--font-metadata); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lyrics-run-counters { flex:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); width:100%; max-width:1440px; gap:var(--space-4); margin:0; }
+.lyrics-run-counters dt { font:var(--font-metadata); color:var(--text-muted); }
+.lyrics-run-counters dd { font:var(--font-section-title); font-variant-numeric:tabular-nums; margin:var(--space-1) 0 0; color:var(--text-primary); }
+.lyrics-problems { display:flex; flex-direction:column; flex:1; width:100%; max-width:1440px; min-height:160px; min-width:0; gap:var(--space-3); }
+.lyrics-problems h2 { margin:0; font:var(--font-section-title); }
+.lyrics-problems .ds-tabs [role=tab] { white-space:nowrap; }
+.lyrics-problems .ds-tabs { flex:none; align-self:flex-start; }
+.lyrics-problem-scroll { flex:1; min-height:100px; overflow:auto; overscroll-behavior:contain; }
+.lyrics-problem-scroll:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; }
+.lyrics-problem-row { display:grid; grid-template-columns:minmax(0,1fr) 220px 160px; align-items:center; gap:var(--space-3); padding:0 var(--space-2); border-bottom:var(--border-default); }
+.lyrics-problem-row > div { min-width:0; }
+.lyrics-problem-row strong { display:block; font:var(--font-row-title); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lyrics-problem-row small { display:block; color:var(--text-secondary); font:var(--font-metadata); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lyrics-problem-row > span { color:var(--text-muted); font:var(--font-metadata); }
+.lyrics-status-note { flex:none; margin:0; color:var(--text-secondary); font:var(--font-secondary); }
+@media(prefers-reduced-motion:reduce) { .synced-lyrics button { transition:none; } }

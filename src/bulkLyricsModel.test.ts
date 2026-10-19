@@ -28,13 +28,13 @@ test('Start sends one IPC call and begins polling only for running state',async(
 test('scope and every supported limit are explicit start-only IPC arguments',async()=>{
   assert.deepEqual(bulkLyricsLimits,[10,25,50,100,250,'all']);
   assert.deepEqual(defaultBulkLyricsSelection,{scope:'all_library',limit:50});
-  assert.equal(bulkLyricsScopeLabel('recent_downloads'),'Recent downloads');
-  assert.deepEqual(bulkLyricsStartArgs({scope:'recent_downloads',limit:25}),{scope:'recent_downloads',limit:25});
+  assert.equal(bulkLyricsScopeLabel('all_library'),'Вся медиатека');
+  assert.deepEqual(bulkLyricsStartArgs({scope:'all_library',limit:25}),{scope:'all_library',limit:25});
   assert.deepEqual(bulkLyricsStartArgs({scope:'all_library',limit:'all'}),{scope:'all_library',limit:null});
   const calls:{command:string;args?:Record<string,unknown>}[]=[];
   const poller=new BulkLyricsPoller(async(command,args)=>{calls.push({command,args});return progress('completed',{total:3,processed:3});},()=>{},()=>{});
-  await poller.start({scope:'recent_downloads',limit:50});
-  assert.deepEqual(calls,[{command:'start_bulk_lyrics_indexing',args:{scope:'recent_downloads',limit:50}}]);poller.dispose();
+  await poller.start({scope:'all_library',limit:50});
+  assert.deepEqual(calls,[{command:'start_bulk_lyrics_indexing',args:{scope:'all_library',limit:50}}]);poller.dispose();
 });
 
 test('idle status does not start polling',async()=>{
@@ -115,13 +115,13 @@ test('Start is available again after cancelled or completed',async()=>{
 test('cancelled job can restart with a different selection',async()=>{
   const starts:Record<string,unknown>[]=[];let run=0;
   const poller=new BulkLyricsPoller(async(command,args)=>{if(command==='start_bulk_lyrics_indexing'){starts.push(args!);return progress(run++===0?'cancelled':'completed');}return progress('cancelled');},()=>{},()=>{});
-  await poller.start({scope:'recent_downloads',limit:10});await poller.start({scope:'all_library',limit:'all'});
-  assert.deepEqual(starts,[{scope:'recent_downloads',limit:10},{scope:'all_library',limit:null}]);poller.dispose();
+  await poller.start({scope:'all_library',limit:10});await poller.start({scope:'all_library',limit:'all'});
+  assert.deepEqual(starts,[{scope:'all_library',limit:10},{scope:'all_library',limit:null}]);poller.dispose();
 });
 
 test('lyrics page reads job status only while visible and starts indexing only on the explicit action',()=>{
   const source=readFileSync(new URL('./BulkLyricsIndexer.tsx',import.meta.url),'utf8');
-  assert.match(source,/value=\{scope\} disabled=\{active\}/);assert.match(source,/value=\{limit\} disabled=\{active\}/);
+  assert.match(source,/scope=defaultBulkLyricsSelection.scope/);assert.match(source,/value=\{limit\} disabled=\{active\|\|starting\}/);
   assert.match(source,/if\(!checked\|\|!available\|\|!visible\)return/);assert.match(source,/poller\.current\.start\(\{scope,limit\}\)/);
   assert.doesNotMatch(source,/invoke<BulkLyricsEligibility>/);
   assert.doesNotMatch(source,/bulk_lyrics_indexing_eligibility/);

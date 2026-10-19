@@ -1,0 +1,153 @@
+name: iOS Simulator Checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-checks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      IOS_CI_OUTPUT: ${{ github.workspace }}/ios/ci-output
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select installed stable Xcode 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$IOS_CI_OUTPUT"
+          XCODE_APP=$(python3 - <<'PY'
+          import pathlib, re
+          apps = [p for p in pathlib.Path('/Applications').glob('Xcode_26*.app')
+                  if re.fullmatch(r'Xcode_26(?:\.\d+)*\.app', p.name)]
+          if not apps:
+              raise SystemExit('No stable Xcode 26 installed on this runner')
+          print(max(apps, key=lambda p: tuple(map(int, re.findall(r'\d+', p.name)))))
+          PY
+          )
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version | tee "$IOS_CI_OUTPUT/xcode-version.txt"
+          xcodebuild -showsdks > "$IOS_CI_OUTPUT/sdks.txt"
+          # This job never generates or bundles pairing credentials.
+          rm -f ios/Tests/Fixtures/network-pairing.json
+
+      - name: Generate existing Xcode project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+          (cd ios && xcodegen generate) 2>&1 | tee "$IOS_CI_OUTPUT/project-generation.log"
+          xcodebuild -list -project ios/Undertone.xcodeproj > "$IOS_CI_OUTPUT/project-targets.txt"
+
+      - name: Select two installed iPhone Simulator sizes
+        run: |
+          python3 scripts/test_ios_simulator_ci.py
+          python3 scripts/ios-simulator-ci.py
+
+      - name: Boot primary Simulator
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl boot "$IOS_PRIMARY"
+          xcrun simctl bootstatus "$IOS_PRIMARY" -b
+          xcrun simctl status_bar "$IOS_PRIMARY" override --time '9:41' --batteryState charged --batteryLevel 100
+
+      - name: Compile application and both test targets
+        id: build
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing -project ios/Undertone.xcodeproj -scheme Undertone \
+            -destination "platform=iOS Simulator,id=$IOS_PRIMARY" \
+            -derivedDataPath ios/ci-build -resultBundlePath "$IOS_CI_OUTPUT/Build.xcresult" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$IOS_CI_OUTPUT/build.log"
+
+      - name: Run unit and UI tests on primary size
+        id: primary
+        timeout-minutes: 40
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild test-without-building -project ios/Undertone.xcodeproj -scheme Undertone \
+            -destination "platform=iOS Simulator,id=$IOS_PRIMARY" \
+            -derivedDataPath ios/ci-build -resultBundlePath "$IOS_CI_OUTPUT/Primary.xcresult" \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
+            -skip-testing:UndertoneTests/LibraryTests/testDownloadQueueTransfersPinnedOriginal \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$IOS_CI_OUTPUT/primary-tests.log"
+
+      - name: Smoke tests and screenshots on second size
+        id: secondary
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl shutdown "$IOS_PRIMARY" || true
+          xcrun simctl boot "$IOS_SECONDARY"
+          xcrun simctl bootstatus "$IOS_SECONDARY" -b
+          xcrun simctl status_bar "$IOS_SECONDARY" override --time '9:41' --batteryState charged --batteryLevel 100
+          xcodebuild test-without-building -project ios/Undertone.xcodeproj -scheme Undertone \
+            -destination "platform=iOS Simulator,id=$IOS_SECONDARY" \
+            -derivedDataPath ios/ci-build -resultBundlePath "$IOS_CI_OUTPUT/Secondary.xcresult" \
+            -only-testing:UndertoneUITests/SimulatorSmokeTests \
+            -parallel-testing-enabled NO -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$IOS_CI_OUTPUT/secondary-tests.log"
+
+      - name: Export results and screenshot attachments
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$IOS_CI_OUTPUT"
+          for RESULT in Primary Secondary; do
+            BUNDLE="$IOS_CI_OUTPUT/$RESULT.xcresult"
+            if [ -d "$BUNDLE" ]; then
+              xcrun xcresulttool get test-results summary --path "$BUNDLE" --compact \
+                > "$IOS_CI_OUTPUT/$RESULT-summary.json" 2> "$IOS_CI_OUTPUT/$RESULT-export.log" || true
+              xcrun xcresulttool export attachments --path "$BUNDLE" \
+                --output-path "$IOS_CI_OUTPUT/$RESULT-attachments" \
+                >> "$IOS_CI_OUTPUT/$RESULT-export.log" 2>&1 || echo "::warning::Attachment export failed; use the xcresult bundle."
+            fi
+          done
+          {
+            echo '## iOS Simulator Checks'
+            echo 'Compile: ${{ steps.build.outcome }}'
+            echo 'Primary unit/UI: ${{ steps.primary.outcome }}'
+            echo 'Second size smoke: ${{ steps.secondary.outcome }}'
+            echo 'Only executed tests are evidence; inspect xcresult for failures/skips.'
+            echo 'Pinned PC networking test excluded: no pairing fixture in this manual UI job.'
+            echo 'Download ios-simulator-results from this run for logs, results and screenshots.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Simulator evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-results
+          path: ios/ci-output/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+
+      - name: Shut down job Simulators
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${IOS_PRIMARY:-}" ]; then xcrun simctl shutdown "$IOS_PRIMARY" || true; fi
+          if [ -n "${IOS_SECONDARY:-}" ]; then xcrun simctl shutdown "$IOS_SECONDARY" || true; fi

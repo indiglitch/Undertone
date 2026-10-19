@@ -1,0 +1,56 @@
+/* Reference identity: ink black, lavender outlines, editorial serif headings. */
+body { background: #050506; }
+.library-heading.page-header h1, .now-playing-title { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: 0; }
+.library-content .collection-tabs { border-color: #ffffff15; }
+.library-content .collection-tabs button { font-weight: 400; }
+.library-content .collection-signature { border-color: #c18cf560; background: transparent; border-radius: 10px; }
+.library-content .signature-code, .library-content .signature-side { display: none; }
+
+
+
+
+
+/* Compact search: one tall local list and network results on demand. */
+
+
+
+
+
+
+
+/* A light density pass for Home, keeping its sequence and serif hierarchy. */
+.recent-row-leading { position: relative; display: grid; place-items: center; width: 28px; min-height: 28px; }
+.recent-row-index { transition: opacity 150ms; }
+.recent-row-play { position: absolute; color: #c18cf5; opacity: 0; transition: opacity 150ms; }
+/* One compact context-menu system, shared by track, playlist and submenus. */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Shared library rows on Home; the page owns scrolling. */
+.playlist-filter { min-height: 36px; gap: 9px; margin-bottom: 10px; background: #0b090e; border-color: #28212f; border-radius: 7px; }
+.playlist-filter input, .playlist-filter input:focus { height: 34px; padding: 0; margin: 0; border: 0; border-radius: 0; box-shadow: none; outline: none; background: transparent; color: #e2dfea; font: inherit; font-size: 12px; }
+.playlist-filter input::placeholder { color: #a49baa; }
+.playlist-filter small { color: #a49baa; font-size: 11px; }
+.playlist-filter .icon-button { width: 26px; height: 26px; }
+.library-content .playlist-filter input, .library-content .playlist-filter input:focus { background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 0; min-height: 0; }
+/* Stable desktop settings, with a single scrolling content pane. */

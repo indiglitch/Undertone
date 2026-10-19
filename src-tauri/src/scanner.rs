@@ -85,8 +85,8 @@ pub fn scan(db: &Database, folders: Vec<String>, state: &ScanState) -> Result<()
     import_files(db, files, state, &metadata::LocalMetadata)
 }
 
-/// Shared intake for folder discovery, completed downloads, watches and device sync.
-/// Call only with completed local files. Does not register a download as a watched folder.
+/// Shared intake for folder discovery, watches and device sync.
+/// Call only with completed local files. Does not register an individual input file as a watched folder.
 pub fn import_files(
     db: &Database,
     files: Vec<PathBuf>,

@@ -1,42 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { BookOpenCheck, ListChecks, RefreshCw, Search, X } from 'lucide-react';
-import { BulkLyricsPoller, bulkLyricsAvailability, bulkLyricsCounters, bulkLyricsCurrent, bulkLyricsLimits, defaultBulkLyricsSelection, emptyBulkLyricsProgress, isBulkLyricsActive, type BulkLyricsLimit, type BulkLyricsProgress, type BulkLyricsScope } from './bulkLyricsModel';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {useVirtualizer} from '@tanstack/react-virtual';
+import {invoke} from '@tauri-apps/api/core';
+import {BookOpenCheck,X} from 'lucide-react';
+import PageHeader from './PageHeader';
+import {Button,Tabs} from './ui';
+import {BulkLyricsPoller,bulkLyricsAvailability,bulkLyricsCounters,bulkLyricsLimits,defaultBulkLyricsSelection,emptyBulkLyricsProgress,isBulkLyricsActive,type BulkLyricsLimit,type BulkLyricsProgress} from './bulkLyricsModel';
+import './LyricsPresentation.css';
 
-export default function BulkLyricsIndexer({available,checked,visible}:{available:boolean;checked:boolean;visible:boolean}){
-  const [progress,setProgress]=useState<BulkLyricsProgress>(emptyBulkLyricsProgress);
-  const [notice,setNotice]=useState('');
-  const [scope,setScope]=useState<BulkLyricsScope>(defaultBulkLyricsSelection.scope),[limit,setLimit]=useState<BulkLyricsLimit>(defaultBulkLyricsSelection.limit),[starting,setStarting]=useState(false),[statusLoading,setStatusLoading]=useState(false);
-  const poller=useRef<BulkLyricsPoller|null>(null);
-  useEffect(()=>{
-    if(!checked||!available||!visible)return;
-    let alive=true;setStatusLoading(true);
-    const next=new BulkLyricsPoller(invoke,setProgress,()=>setNotice('Не удалось обновить состояние индексации.'));
-    poller.current=next;
-    void next.load().finally(()=>{if(alive)setStatusLoading(false);});
-    return()=>{alive=false;next.dispose();if(poller.current===next)poller.current=null;};
-  },[available,checked,visible]);
-  const active=isBulkLyricsActive(progress.phase);
-  const availability=bulkLyricsAvailability(checked,available),counters=bulkLyricsCounters(progress);
-  const start=async()=>{if(starting||statusLoading||active||!poller.current)return;setNotice('');setStarting(true);try{await poller.current.start({scope,limit});}finally{setStarting(false);}};
-  const cancel=()=>{setNotice('');void poller.current?.cancel();};
-  return <section className="lyrics-indexer lyrics-management" aria-labelledby="lyrics-indexer-title" hidden={!visible}>
-    <div className="section-heading"><div><h1 id="lyrics-indexer-title">Тексты песен</h1><p>Находите недостающие тексты для локальной библиотеки.</p></div><span className={`job-state ${active?'active':''}`}>{({idle:'Ожидание',running:'Выполняется',cancelling:'Отмена',completed:'Завершено',cancelled:'Отменено',failed:'Ошибка'} as Record<string,string>)[progress.phase]||progress.phase}</span></div>
-    <p className="helper-text lyrics-indexer-help">Поиск текстов проверяет только треки без актуального текста. Локальные — уже есть в файле; кэшированные — сохранены после прошлой проверки; ошибки относятся к текущему запуску.</p>
-    <div className="lyrics-indexer-layout"><div className="lyrics-indexer-main">
-    {availability==='checking'?<p className="lyrics-indexer-note">Проверяем доступность внешнего поиска текстов…</p>:availability==='unavailable'?<p className="lyrics-indexer-note">Внешний поиск текстов недоступен в этой сборке.</p>:<>
-      <div className="lyrics-indexer-options">
-        <label>Область<select value={scope} disabled={active} onChange={event=>setScope(event.target.value as BulkLyricsScope)}><option value="all_library">Вся медиатека</option><option value="recent_downloads">Недавние загрузки</option></select></label>
-        <label>Проверить треков<select value={limit} disabled={active} onChange={event=>setLimit(event.target.value==='all'?'all':Number(event.target.value) as BulkLyricsLimit)}>{bulkLyricsLimits.map(value=><option key={value} value={value}>{value==='all'?'Все':value}</option>)}</select></label>
-      </div>
-      <div className="lyrics-indexer-progress"><span><strong>{counters.processed}</strong> / {counters.total}</span><progress max={counters.total||1} value={counters.processed}/><small>Осталось: {counters.remaining}</small></div>
-      <div className="lyrics-indexer-current"><span>Текущий трек</span><strong>{bulkLyricsCurrent(progress)}</strong></div>
-      <section className="lyrics-run-stats" aria-labelledby="lyrics-run-stats-title"><h2 id="lyrics-run-stats-title">Текущий запуск</h2><dl className="lyrics-indexer-counters">
-        <div><dt>Найдено</dt><dd>{counters.found}</dd></div><div><dt>Локальные</dt><dd>{counters.localExisting}</dd></div><div><dt>Кэш / пропущено</dt><dd>{counters.skipped}</dd></div><div><dt>Не найдено</dt><dd>{counters.notFound}</dd></div><div><dt>Неоднозначно</dt><dd>{counters.ambiguous}</dd></div><div><dt>Ошибки</dt><dd>{counters.temporaryErrors+counters.permanentErrors}</dd></div>
-      </dl></section>
-      <div className="lyrics-indexer-actions"><button className="subtle-button" disabled={active||starting||statusLoading} onClick={()=>void start()}><RefreshCw size={16}/>{starting?'Запуск…':'Найти недостающие тексты'}</button><button className="text-button" disabled={!active||progress.phase==='cancelling'||statusLoading} onClick={cancel}><X size={16}/>Отмена</button></div>
-      {notice&&<p className="lyrics-indexer-note" role="status">{notice}</p>}
-    </>}
-    </div><aside className="lyrics-indexer-guide"><div className="lyrics-guide-icon"><BookOpenCheck size={21}/></div><h2>Проверка библиотеки</h2><p>Ищите тексты для треков, которым они ещё нужны. Выбранные папки с музыкой и сами файлы останутся без изменений.</p><ol><li><span><ListChecks size={15}/></span><div><strong>Выберите охват</strong><small>Вся медиатека или недавние загрузки</small></div></li><li><span><Search size={15}/></span><div><strong>Запустите поиск</strong><small>Результаты появятся в счётчиках запуска</small></div></li><li><span><BookOpenCheck size={15}/></span><div><strong>Следите за ходом</strong><small>Текущий трек и остаток видны рядом</small></div></li></ol></aside></div>
-  </section>;
+export default function BulkLyricsIndexer({available,checked,visible,onOpenTrack,onCompleted}:{available:boolean;checked:boolean;visible:boolean;onOpenTrack?:(id:number)=>void;onCompleted?:()=>void}){
+ const [progress,setProgress]=useState<BulkLyricsProgress>(emptyBulkLyricsProgress),[notice,setNotice]=useState(''),[limit,setLimit]=useState<BulkLyricsLimit>(defaultBulkLyricsSelection.limit),[starting,setStarting]=useState(false),[statusLoading,setStatusLoading]=useState(false);
+ const startPending=useRef(false),cancelPending=useRef(false);
+ const previousPhase=useRef(progress.phase),completedCallback=useRef(onCompleted);completedCallback.current=onCompleted;
+ useEffect(()=>{if(isBulkLyricsActive(previousPhase.current)&&!isBulkLyricsActive(progress.phase))completedCallback.current?.();previousPhase.current=progress.phase;},[progress.phase]);
+ const [filter,setFilter]=useState<'all'|'not_found'|'ambiguous'|'failed'>('all'),poller=useRef<BulkLyricsPoller|null>(null),scroll=useRef<HTMLDivElement>(null);
+ useEffect(()=>{if(!checked||!available||!visible)return;let alive=true;setStatusLoading(true);const next=new BulkLyricsPoller(invoke,setProgress,()=>setNotice('Не удалось прочитать состояние обработки. Попробуйте открыть страницу снова.'));poller.current=next;void next.load().finally(()=>{if(alive)setStatusLoading(false);});return()=>{alive=false;next.dispose();if(poller.current===next)poller.current=null;};},[available,checked,visible]);
+ const active=isBulkLyricsActive(progress.phase),availability=bulkLyricsAvailability(checked,available),counters=bulkLyricsCounters(progress),scope=defaultBulkLyricsSelection.scope;
+ const problems=useMemo(()=>(progress.problems??[]).filter(problem=>filter==='all'||problem.status===filter),[progress.problems,filter]);
+ const rows=useVirtualizer({count:problems.length,getScrollElement:()=>scroll.current,estimateSize:()=>64,overscan:5,getItemKey:index=>problems[index].track.track_id});
+ useEffect(()=>{scroll.current?.scrollTo({top:0});},[filter]);
+ const start=async()=>{if(startPending.current||starting||statusLoading||active||!poller.current)return;startPending.current=true;setNotice('');setStarting(true);setFilter('all');try{await poller.current.start({scope,limit});}finally{startPending.current=false;setStarting(false);}};
+ const cancel=()=>{if(cancelPending.current||!poller.current)return;cancelPending.current=true;setNotice('');void poller.current.cancel().finally(()=>{cancelPending.current=false;});};
+ const labels={not_found:'Текст не найден',ambiguous:'Неоднозначное совпадение',failed:'Ошибка проверки'};
+ return <section className="lyrics-management" aria-label="Управление текстами" hidden={!visible}>
+  <PageHeader icon={<BookOpenCheck size={28}/>} title="Тексты песен" subtitle="Проверка локальной библиотеки"/>
+  <p className="lyrics-management-description">Проверяем треки без актуального текста. Локальные и кэшированные тексты сохраняются; ошибки и счётчики относятся к текущему запуску. Музыкальные файлы не изменяются.</p>
+  {availability==='checking'?<p role="status">Проверяем доступность источника текстов…</p>:availability==='unavailable'?<p className="lyrics-status-note" role="status">Внешний поиск текстов недоступен в этой сборке.</p>:<>
+   <div className="lyrics-management-actions"><Button variant="primary" disabled={active||statusLoading} busy={starting} busyLabel="Запуск…" onClick={()=>void start()}>Проверить библиотеку</Button><label>Максимум треков<select aria-label="Максимум треков" value={limit} disabled={active||starting} onChange={event=>setLimit(event.target.value==='all'?'all':Number(event.target.value) as BulkLyricsLimit)}>{bulkLyricsLimits.map(value=><option key={value} value={value}>{value==='all'?'Все':value}</option>)}</select></label>{active&&<Button disabled={progress.phase==='cancelling'} onClick={cancel}><X aria-hidden="true"/>{progress.phase==='cancelling'?'Останавливаем…':'Остановить'}</Button>}</div>
+   {progress.phase!=='idle'&&<div className="lyrics-run-progress"><div><strong>{({running:'Проверяем библиотеку',cancelling:'Завершаем текущий запрос',completed:'Проверка завершена',cancelled:'Проверка остановлена'} as Record<string,string>)[progress.phase]}</strong><span>{counters.processed} / {counters.total} · осталось {counters.remaining}</span></div><progress aria-label="Проверка текстов" max={counters.total||1} value={counters.processed}/>{active&&progress.current&&<p className="lyrics-current-track">{progress.current.title} — {progress.current.artist}</p>}</div>}
+   {progress.phase!=='idle'&&<dl className="lyrics-run-counters"><div><dt>Всего</dt><dd>{counters.total}</dd></div><div><dt>Уже локально</dt><dd>{counters.localExisting}</dd></div><div><dt>Найдено и сохранено</dt><dd>{counters.found}</dd></div><div><dt>Кэш / пропущено</dt><dd>{counters.skipped}</dd></div><div><dt>Не найдено</dt><dd>{counters.notFound}</dd></div><div><dt>Неоднозначно</dt><dd>{counters.ambiguous}</dd></div><div><dt>Ошибки</dt><dd>{counters.temporaryErrors+counters.permanentErrors}</dd></div></dl>}
+   {!!progress.problems?.length&&<section className="lyrics-problems" aria-labelledby="lyrics-problems-heading"><h2 id="lyrics-problems-heading">Требуют внимания</h2><Tabs label="Результаты проверки" value={filter} onValueChange={setFilter} items={[{value:'all',panelId:'lyrics-problem-list',label:'Все'},{value:'not_found',panelId:'lyrics-problem-list',label:'Не найдено'},{value:'ambiguous',panelId:'lyrics-problem-list',label:'Неоднозначно'},{value:'failed',panelId:'lyrics-problem-list',label:'Ошибки'}]}/><div id="lyrics-problem-list" className="lyrics-problem-scroll" ref={scroll} tabIndex={0} role="region" aria-label="Проблемные треки"><div style={{height:rows.getTotalSize(),position:'relative'}}>{rows.getVirtualItems().map(row=>{const problem=problems[row.index];return <div className="lyrics-problem-row" key={problem.track.track_id} style={{position:'absolute',top:row.start,height:64,width:'100%'}}><div><strong title={problem.track.title}>{problem.track.title}</strong><small title={problem.track.artist}>{problem.track.artist}</small></div><span>{labels[problem.status]}</span>{onOpenTrack&&<Button variant="ghost" onClick={()=>onOpenTrack(problem.track.track_id)}>Открыть альбом</Button>}</div>;})}</div>{!problems.length&&<p className="lyrics-status-note">В этой категории проблем нет.</p>}</div>{!!progress.problems_omitted&&<p className="lyrics-status-note">В списке до 200 треков каждого статуса; ещё {progress.problems_omitted} учтены в счётчиках.</p>}</section>}
+   {progress.phase==='completed'&&!progress.problems?.length&&<p className="lyrics-status-note">{counters.temporaryErrors+counters.permanentErrors>0?'Проверка завершилась с ошибками. Попробуйте позже.':'Проверка завершена без проблемных треков.'}</p>}
+   {notice&&<p className="lyrics-status-note" role="alert">{notice}</p>}
+  </>}
+ </section>;
 }

@@ -20,6 +20,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install frontend dependencies
         run: npm ci
+      - name: Run regression and backend tests
+        run: npm test
+      - name: Remove runner paths from native binaries
+        shell: pwsh
+        run: |
+          $flags=@("--remap-path-prefix=$env:GITHUB_WORKSPACE=undertone","--remap-path-prefix=$env:USERPROFILE=build-home")
+          "CARGO_ENCODED_RUSTFLAGS=$($flags -join [char]31)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Build and publish signed update
         uses: tauri-apps/tauri-action@v1
         env:
@@ -34,7 +41,7 @@ jobs:
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: --features slskd,external-lyrics
+          args: --features external-lyrics
       - name: Replace API asset URLs in the updater manifest
         shell: pwsh
         env:

@@ -1,0 +1,68 @@
+import XCTest
+@testable import Undertone
+
+final class PersonalLibraryTests: XCTestCase {
+    private func root() throws -> URL { let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString); try FileManager.default.createDirectory(at:url,withIntermediateDirectories:true); return url }
+    func testNestedFolderMovesRejectCyclesAndMissingParent() {
+        var state = PersonalState(); state.folders = [LibraryFolder(id:"a",name:"A"),LibraryFolder(id:"b",name:"B",parent:"a"),LibraryFolder(id:"c",name:"C",parent:"b")]
+        XCTAssertFalse(state.moveFolder("a",to:"c")); XCTAssertFalse(state.moveFolder("b",to:"missing")); XCTAssertTrue(state.moveFolder("c",to:nil))
+        XCTAssertEqual(state.folders.first(where:{$0.id == "b"})?.parent,"a")
+    }
+    func testDeleteFolderPromotesContentsWithoutDeletingPlaylists() {
+        var state = PersonalState(); state.folders = [LibraryFolder(id:"a",name:"A"),LibraryFolder(id:"b",name:"B",parent:"a"),LibraryFolder(id:"c",name:"C",parent:"b")]; state.playlists = [PersonalPlaylist(id:"p",name:"Keep",tracks:["song"])]; state.playlistFolders["p"] = "b"
+        state.deleteFolder("b"); XCTAssertEqual(state.folders.first(where:{$0.id == "c"})?.parent,"a"); XCTAssertEqual(state.playlistFolders["p"],"a"); XCTAssertEqual(state.playlists.first?.tracks,["song"])
+    }
+    func testPersonalStorageRoundTrip() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }; let storage = PersonalStorage(root:directory)
+        var state = PersonalState(); state.likes = ["local"]; state.albums = ["Artist — Album"]; state.artists = ["Artist"]; state.pins = ["folder:a"]; state.searches = ["query"]; state.recents = ["song"]; state.folders = [LibraryFolder(id:"a",name:"Folder")]; state.playlists = [PersonalPlaylist(id:"p",name:"Playlist",tracks:["song"])]; state.playlistFolders["p"] = "a"
+        try await storage.save(state); let restored = try await PersonalStorage(root:directory).read(); XCTAssertEqual(restored.likes,state.likes); XCTAssertEqual(restored.playlists,state.playlists); XCTAssertEqual(restored.folders,state.folders); XCTAssertEqual(restored.playlistFolders,state.playlistFolders); XCTAssertEqual(restored.recents,state.recents)
+    }
+    func testPlaybackSnapshotKeepsOrderRepeatAndPosition() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }; let storage = PlayerStorage(root:directory)
+        try await storage.save(PlayerSnapshot(ids:["a","c","b"],currentID:"c",repeatMode:"one",position:52.5)); let restored = try await PlayerStorage(root:directory).read(); XCTAssertEqual(restored?.ids,["a","c","b"]); XCTAssertEqual(restored?.currentID,"c"); XCTAssertEqual(restored?.repeatMode,"one"); XCTAssertEqual(restored?.position,52.5)
+    }
+    func testLRCMultipleTimesFractionsAndPlainFallback() {
+        let doc = LyricsDocument.parse("[00:01.5][00:04.250]Line one\n[00:02]Line two\n[ar:Artist]\n[00:99]Invalid")
+        XCTAssertEqual(doc.lines.map(\.timestamp_ms),[1500,2000,4250]); XCTAssertEqual(doc.lines.map(\.text),["Line one","Line two","Line one"]); XCTAssertEqual(LyricsDocument.parse("Plain lyrics").plain,"Plain lyrics")
+    }
+    func testOriginalRemovalCanBeUndoneWithoutChangingBytes() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }; let repo = LibraryRepository(root:directory); try await repo.prepare()
+        let song = Song(id:String(repeating:"a",count:64),syncID:nil,filename:"a.wav",title:"Original",artist:"Artist",album:"Album",duration:1,size:4,format:"WAV",addedAt:Date()); let original = Data([1,2,3,4]); let file = try await repo.fileURL(song); try original.write(to:file); try await repo.write([song])
+        let removed = try await repo.removePhoneCopies([song]); let empty = try await repo.read(); XCTAssertTrue(empty.isEmpty); XCTAssertFalse(FileManager.default.fileExists(atPath:file.path)); let bytes = try await repo.trashSize(); XCTAssertEqual(bytes,4)
+        try await repo.restorePhoneCopies(removed); XCTAssertEqual(try Data(contentsOf:file),original); let restored = try await repo.read(); XCTAssertEqual(restored,[song])
+    }
+    func testMusicLinksNeverCarryPairingAndRejectForeignURLs() {
+        let url = MusicLinks.make("album","Artist — Album & more")
+        XCTAssertEqual(MusicLinks.parse(url)?.value,"Artist — Album & more")
+        XCTAssertNil(MusicLinks.parse(URL(string:"https://example.com/album")!))
+        XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album?id=test&token=secret")!))
+        XCTAssertNil(MusicLinks.parse(URL(string:"undertone://album/path?id=test")!))
+    }
+
+    @MainActor func testNativePlayerRestoresPausedThenTransitionsWithCrossfade() async throws {
+        let directory = try root(); defer { try? FileManager.default.removeItem(at:directory) }
+        let repo = LibraryRepository(root:directory), storage = PlayerStorage(root:directory)
+        var bytes = Data()
+        func text(_ value:String) { bytes.append(contentsOf:value.utf8) }
+        func u16(_ value:UInt16) { var v = value.littleEndian; withUnsafeBytes(of:&v) { bytes.append(contentsOf:$0) } }
+        func u32(_ value:UInt32) { var v = value.littleEndian; withUnsafeBytes(of:&v) { bytes.append(contentsOf:$0) } }
+        text("RIFF");u32(16036);text("WAVEfmt ");u32(16);u16(1);u16(1);u32(8000);u32(16000);u16(2);u16(16);text("data");u32(16000);bytes.append(Data(repeating:0,count:16000))
+        let source = directory.appendingPathComponent("test.wav");try bytes.write(to:source); let song = try await repo.importFile(source)
+        try await storage.save(PlayerSnapshot(ids:[song.id],currentID:song.id,repeatMode:"all",position:0.3))
+        let player = MusicPlayer(storage:storage); var plays = 0; player.onTrack = { _ in plays += 1 }
+        await player.restore([song],repository:repo)
+        XCTAssertEqual(player.current?.id,song.id); XCTAssertFalse(player.playing); XCTAssertEqual(player.position,0.3,accuracy:0.03); XCTAssertEqual(player.repeatMode,.all); XCTAssertEqual(plays,0)
+        bytes[bytes.count-1] = 1; let secondSource = directory.appendingPathComponent("second.wav"); try bytes.write(to:secondSource); let second = try await repo.importFile(secondSource)
+        await player.play(song,queue:[song,second],repository:repo); XCTAssertTrue(player.playing)
+        await player.advance(1,fadeDuration:0.05); XCTAssertEqual(player.current?.id,second.id); XCTAssertTrue(player.playing)
+        player.pause(); XCTAssertFalse(player.playing)
+    }
+
+    func testCrossfadeDoesNotCutLongTailForShortNextTrack() {
+        XCTAssertEqual(CrossfadePolicy.duration(requested:12,current:240,next:4),2)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:4,current:240,next:180),4)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:12,current:240,next:0),0)
+        XCTAssertEqual(CrossfadePolicy.duration(requested:.nan,current:240,next:4),0)
+    }
+
+}

@@ -1,0 +1,15 @@
+const fs=require('node:fs'),crypto=require('node:crypto'),assert=require('node:assert/strict'),path=require('node:path');
+const dir=path.resolve('releases/phase14'),config=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json'));
+const file=path.join(dir,`Undertone_${config.version}_x64-setup.exe`);
+const publicText=Buffer.from(config.plugins.updater.pubkey,'base64').toString('utf8').trim().split('\n');
+const pub=Buffer.from(publicText[1],'base64');
+const lines=Buffer.from(fs.readFileSync(file+'.sig','utf8').trim(),'base64').toString('utf8').trim().split('\n');
+const sig=Buffer.from(lines[1],'base64');assert.equal(sig.subarray(2,10).toString('hex'),pub.subarray(2,10).toString('hex'));
+const key=crypto.createPublicKey({key:Buffer.concat([Buffer.from('302a300506032b6570032100','hex'),pub.subarray(10)]),format:'der',type:'spki'});
+const bytes=fs.readFileSync(file),data=sig.subarray(0,2).toString()==='ED'?crypto.createHash('blake2b512').update(bytes).digest():bytes;
+assert(crypto.verify(null,data,key,sig.subarray(10)),'Invalid updater artifact signature');
+const exe=fs.readFileSync(path.join(dir,'Undertone.exe'));const pe=exe.readUInt32LE(0x3c);assert.equal(exe.readUInt16LE(pe+4),0x8664);
+const ascii=exe.toString('latin1'),unicode=exe.toString('utf16le');for(const prefix of [process.cwd(),process.env.USERPROFILE])if(prefix)assert(!ascii.includes(prefix)&&!unicode.includes(prefix),`Developer path leaked: ${prefix}`);
+assert(!ascii.includes('Synthetic Song'),'QA fixture leaked into production binary');
+const result={version:config.version,architecture:'x86_64',updaterSignatureVerified:true,developerPathsAbsent:true,artifacts:fs.readdirSync(dir).filter(f=>f.endsWith('.exe')||f.endsWith('.sig')).map(f=>({name:f,sha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(dir,f))).digest('hex')}))};
+fs.writeFileSync('qa-output/phase14-release-verification.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));

@@ -1,0 +1,69 @@
+/* iOS identity: Color.canvas (0.035,0.035,0.065), Color.undertone
+   (0.68,0.49,1), Artwork radius 22%, GlassSurface radius 28.
+   Desktop keeps its tables, resizable panes and three-zone controls. */
+:root {
+  --bg-base: #090911;
+  --text-primary: #f7f5fc;
+  --text-secondary: #c4bdce;
+  --text-muted: #a69daf;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --shadow-panel: inset 0 1px 0 #ffffff16, 0 8px 28px #0003;
+  --shadow-card: inset 0 1px 0 #ffffff09;
+  --shadow-card-hover: inset 0 1px 0 #ffffff12, 0 8px 24px #0002;
+}
+:root:not([data-color-palette]), :root[data-color-palette=midnight], .app-shell[data-color-palette=midnight] {
+  --accent-violet: #ad7dff;
+  --accent-blue: #ad7dff;
+  --accent-pink: #ad7dff;
+  --palette-bg-start: #090911;
+  --palette-bg-mid: #090911;
+  --palette-bg-end: #090911;
+  --palette-panel: #24202e;
+  --palette-glow-violet: #ad7dff30;
+}
+
+
+
+.cover { box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.subtle-button, .text-button, .icon-button { color: var(--text-secondary); }
+.subtle-button { background: #ffffff08; border-color: transparent; border-radius: 999px; }
+.text-button, .icon-button.active, .text-button:hover:not(:disabled) { color: var(--accent-violet); }
+
+
+
+
+
+
+input[type=range], progress { accent-color: var(--accent-violet); }
+
+
+
+
+
+
+
+
+ select {
+  background: #ffffff08; border-color: #ffffff12; border-radius: 12px;
+}
+
+.undertone-tooltip { background: #282330f0; color: var(--text-primary); border-color: #ffffff18; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline-color: var(--accent-violet); }
+button:not(:disabled):active { transform: scale(.96); }
+@media (prefers-reduced-motion: reduce) { button:not(:disabled):active { transform: none; } }
+
+
+/* Compact desktop density; hit targets remain at least 40px. */
+.library-heading.page-header h1 { font-size: 26px; }
+.section-heading h2 { font-size: 18px; }
+
+
+
+
+
+
+
+.empty-icon { width: 60px; height: 60px; border-radius: 20px; }

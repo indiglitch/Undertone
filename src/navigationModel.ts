@@ -22,12 +22,12 @@ export function goBack(state:NavigationState):NavigationState{
   const previous=state.back.at(-1);return previous?{current:previous,back:state.back.slice(0,-1)}:state;
 }
 
-export const sidebarIds=['home','search','library','lyrics','recentlyAdded','artists','albums','liked','playlists','history','queue','downloads','settings'] as const;
+export const sidebarIds=['home','search','library','lyrics','recentlyAdded','artists','albums','liked','playlists','history','queue','settings'] as const;
 export type SidebarId=typeof sidebarIds[number];
 export const sidebarGroups=[
   {label:'ОСНОВНОЕ',ids:['home','search','library','recentlyAdded','history']},
   {label:'МУЗЫКА',ids:['liked','queue','playlists','albums','artists']},
-  {label:'ИНСТРУМЕНТЫ',ids:['downloads','lyrics']},
+  {label:'ИНСТРУМЕНТЫ',ids:['lyrics']},
 ] as const satisfies ReadonlyArray<{label:string;ids:readonly SidebarId[]}>;
 export function sidebarGroup(id:SidebarId):number{return sidebarGroups.findIndex(group=>(group.ids as readonly SidebarId[]).includes(id));}
 export function groupedSidebarOrder(order:SidebarId[]):SidebarId[][]{return sidebarGroups.map(group=>order.filter(id=>(group.ids as readonly SidebarId[]).includes(id)));}
@@ -48,7 +48,6 @@ export function reorderSidebar(order:SidebarId[],source:SidebarId,target:Sidebar
 export async function rescanConfiguredFolders(folders:string[],scan:(folders:string[])=>Promise<unknown>){if(folders.length)await scan(folders);}
 export const homeCopy={title:'Главная',emptyTitle:'Медиатека пуста',emptyHelp:'Добавьте папку с MP3, FLAC, M4A, AAC, OGG или WAV.'} as const;
 
-export function downloadPageEntries<T>(operations:T[]):T[]{return operations;}
 export function recentlyAddedTracks<T extends {added_at:string}>(tracks:T[]):T[]{
   return [...tracks].sort((a,b)=>Date.parse(b.added_at)-Date.parse(a.added_at));
 }

@@ -1,0 +1,11 @@
+build/
+package/
+*.ipa
+*.xcodeproj/
+*.xcresult/
+test-build/
+Undertone-iPhone.png
+
+Tests/Fixtures/network-pairing.json
+ci-build/
+ci-output/

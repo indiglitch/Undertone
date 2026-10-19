@@ -33,7 +33,7 @@ test('visualizer owns its 25 FPS updates and player only passes primitive playba
   assert.match(meter,/setInterval\(poll,40\)/);
   assert.match(component,/memo\(function MusicVisualizer/);
   assert.match(hook,/useVisualizerMeter\(active\)/);
-  assert.match(player,/<MusicVisualizer playing=\{status\.playing\} hasTrack=\{current!==null\} open=\{visualizerOpen\} onToggle=\{onVisualizer\}\/>/);
+  assert.match(player,/onClick=\{\(\)=>void run\(onVisualizer\)\}/);assert.doesNotMatch(player,/<MusicVisualizer/);
   assert.doesNotMatch(player,/audio_meter/);
 });
 

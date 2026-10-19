@@ -31,8 +31,9 @@ export function Tooltip({content,children,delay=420,className=''}:{content:React
     return()=>{window.removeEventListener('resize',update);window.removeEventListener('scroll',update,true);};
   },[open,content]);
 
-  const child=isValidElement(children)?cloneElement(children as ReactElement<Record<string,unknown>>,{['aria-describedby']:open?id:undefined}):children;
-  return <span ref={anchorRef} className={`tooltip-anchor ${className}`.trim()}
+  const disabled=!!(children.props as Record<string,unknown>).disabled;
+  const child=isValidElement(children)?cloneElement(children as ReactElement<Record<string,unknown>>,{['aria-describedby']:[(children.props as Record<string,unknown>)['aria-describedby'],open?id:undefined].filter(Boolean).join(' ')||undefined}):children;
+  return <span ref={anchorRef} tabIndex={disabled?0:undefined} aria-disabled={disabled||undefined} aria-label={disabled&&typeof content==='string'?content:undefined} aria-describedby={disabled&&open?id:undefined} className={`tooltip-anchor ${className}`.trim()}
     onPointerDown={()=>{pointerFocusCandidate.current=true;}}
     onPointerUp={()=>{pointerFocusCandidate.current=false;}}
     onPointerCancel={()=>{pointerFocusCandidate.current=false;}}
@@ -41,6 +42,6 @@ export function Tooltip({content,children,delay=420,className=''}:{content:React
     onFocusCapture={()=>{focused.current=true;if(pointerFocusCandidate.current){focusedByPointer.current=true;pointerFocusCandidate.current=false;}schedule();}}
     onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node)){focused.current=false;focusedByPointer.current=false;pointerFocusCandidate.current=false;reconcile();}}}>
     {child}
-    {open&&createPortal(<div ref={tipRef} id={id} role="tooltip" className="undertone-tooltip" style={{left:point.left,top:point.top,visibility:point.ready?'visible':'hidden'}}>{content}</div>,document.body)}
+    {open&&createPortal(<div ref={tipRef} id={id} role="tooltip" className="undertone-tooltip" style={{left:point.left,top:point.top,visibility:point.ready?'visible':'hidden'}}>{content}</div>,anchorRef.current?.closest('dialog[open]')??document.body)}
   </span>;
 }

@@ -1,13 +1,14 @@
 export type BulkLyricsPhase='idle'|'running'|'cancelling'|'completed'|'cancelled';
-export type BulkLyricsScope='all_library'|'recent_downloads';
+export type BulkLyricsScope='all_library';
 export type BulkLyricsLimit=10|25|50|100|250|'all';
 export type BulkLyricsSelection={scope:BulkLyricsScope;limit:BulkLyricsLimit};
 export type BulkLyricsEligibility={eligible:number;selected:number};
 export const bulkLyricsLimits=[10,25,50,100,250,'all'] as const;
 export const defaultBulkLyricsSelection:BulkLyricsSelection={scope:'all_library',limit:50};
-export const bulkLyricsScopeLabel=(scope:BulkLyricsScope)=>scope==='all_library'?'Вся медиатека':'Недавние загрузки';
+export const bulkLyricsScopeLabel=(_scope:BulkLyricsScope)=>'Вся медиатека';
 export const bulkLyricsStartArgs=(selection:BulkLyricsSelection)=>({scope:selection.scope,limit:selection.limit==='all'?null:selection.limit});
-export type BulkLyricsProgress={
+export type BulkLyricsProblem={track:{track_id:number;title:string;artist:string};status:'not_found'|'ambiguous'|'failed'};
+export type BulkLyricsProgress={problems?:BulkLyricsProblem[];problems_omitted?:number;
   phase:BulkLyricsPhase;
   total:number;
   processed:number;

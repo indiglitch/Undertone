@@ -42,6 +42,32 @@ fn fixture() -> PathBuf {
 }
 
 #[test]
+fn local_only_schema_ignores_legacy_remote_preferences_and_preserves_intake() {
+    let root = fixture();
+    let db = Database::open(&root.join("db")).unwrap();
+    let conn = db.connect().unwrap();
+    let remote_tables: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM sqlite_master WHERE name IN ('slskd_settings','slskd_download_finalizations')",
+        [], |row| row.get(0),
+    ).unwrap();
+    assert_eq!(remote_tables, 0);
+    // An upgraded installation may still have these unused historical tables.
+    conn.execute_batch("CREATE TABLE slskd_settings(id INTEGER PRIMARY KEY,server_url TEXT,secret_ref TEXT,download_root TEXT);
+        INSERT INTO slskd_settings VALUES(1,'invalid legacy URL','unused legacy reference','unavailable old folder');
+        CREATE TABLE slskd_download_finalizations(operation_id TEXT PRIMARY KEY,track_id INTEGER REFERENCES tracks(id) ON DELETE SET NULL);").unwrap();
+    drop(conn);
+    let reopened = Database::open(&root.join("db")).unwrap();
+    let progress = Arc::new(Mutex::new(Progress::default()));
+    scan(&reopened, vec![root.join("music").to_string_lossy().into_owned()], &progress).unwrap();
+    assert_eq!(reopened.library().unwrap().tracks.len(), 1);
+    let conn = reopened.connect().unwrap();
+    let retired_versions: i64 = conn.query_row("SELECT COUNT(*) FROM schema_migrations WHERE version IN (4,5)", [], |row| row.get(0)).unwrap();
+    assert_eq!(retired_versions, 2);
+    drop(conn);
+    assert_eq!(Database::open(&root.join("db")).unwrap().library().unwrap().tracks.len(), 1);
+}
+
+#[test]
 fn scan_is_recursive_idempotent_and_isolates_bad_files() {
     let root = fixture();
     let db = Database::open(&root.join("db")).unwrap();
@@ -190,6 +216,7 @@ fn collections_preserve_tracks_and_roll_back_invalid_edits() {
     )
     .unwrap();
     let tracks = db.library().unwrap().tracks;
+    for track in &tracks { assert_eq!(track.size_bytes, Some(std::fs::metadata(&track.path).unwrap().len() as i64)); }
     let (a, b) = (tracks[0].id, tracks[1].id);
     assert!(collections::apply(
         &db,
@@ -275,6 +302,28 @@ fn collections_preserve_tracks_and_roll_back_invalid_edits() {
     )
     .unwrap();
     let duplicate = s.playlists[0].entries[2].id;
+    let exported = collections::export_m3u8(&db, id).unwrap();
+    let paths: Vec<_> = exported.lines().filter(|line| !line.starts_with('#')).collect();
+    assert_eq!(paths, vec![tracks[0].path.as_str(), tracks[1].path.as_str(), tracks[0].path.as_str()]);
+    assert_eq!(exported.matches("#EXTINF:").count(), 3);
+    assert!(exported.starts_with("#EXTM3U\n"));
+    assert!(collections::export_m3u8(&db, -999).is_err());
+    let export = crate::playlist_export::copy_playlist(&db, id, &root).unwrap();
+    assert_eq!(export.file_name().unwrap(), "Обновлённый");
+    assert_eq!(std::fs::read_dir(&export).unwrap().count(), 3);
+    for (index, track) in [&tracks[0], &tracks[1], &tracks[0]].iter().enumerate() {
+        let copied = export.join(format!("{:03} - {}", index + 1, std::path::Path::new(&track.path).file_name().unwrap().to_string_lossy()));
+        assert_eq!(std::fs::read(copied).unwrap(), std::fs::read(&track.path).unwrap());
+    }
+    let second = crate::playlist_export::copy_playlist(&db, id, &root).unwrap();
+    assert_ne!(second, export);
+    assert_eq!(std::fs::read_dir(&export).unwrap().count(), 3);
+    let conn = db.connect().unwrap();
+    conn.execute("UPDATE tracks SET path='missing-export-source.wav' WHERE id=?1", [a]).unwrap();
+    assert!(crate::playlist_export::copy_playlist(&db, id, &root).is_err());
+    assert!(!root.join("Обновлённый (3)").exists());
+    conn.execute("UPDATE tracks SET path=?1 WHERE id=?2", rusqlite::params![tracks[0].path,a]).unwrap();
+    drop(conn);
     let first = s.playlists[0].entries[0].id;
     assert_ne!(
         first, duplicate,

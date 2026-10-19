@@ -1,0 +1,11 @@
+.feedback-host { position:fixed; z-index:400; pointer-events:none; margin:0; }
+.feedback-region { display:flex; flex-direction:column; gap:var(--space-2); }
+.feedback-toast { pointer-events:auto; display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); background:var(--surface-secondary); color:var(--text-primary); border:var(--border-default); border-radius:var(--radius-md); box-shadow:var(--shadow-popover); font:var(--font-secondary); animation:feedback-enter var(--motion-fast,120ms) ease-out; }
+.feedback-message { min-width:0; flex:1; overflow-wrap:anywhere; max-height:144px; overflow:auto; }
+.feedback-icon { width:var(--icon-sm); height:var(--icon-sm); flex:none; color:var(--text-muted); }
+.feedback-toast[data-kind=success] .feedback-icon { color:var(--success); }
+.feedback-toast[data-kind=warning] .feedback-icon { color:var(--warning); }
+.feedback-toast[data-kind=error] .feedback-icon { color:var(--danger); }
+.feedback-toast .ds-button { flex:none; }
+@keyframes feedback-enter { from { opacity:0; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .feedback-toast { animation:none; } }

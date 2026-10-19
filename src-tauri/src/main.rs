@@ -2,11 +2,42 @@
 use undertone::{audio, database, lyrics, scanner};
 #[cfg(target_os = "windows")]
 mod system_actions;
+#[cfg(target_os = "windows")]
+mod media_controls;
 
 use database::{Database, Library};
 use scanner::{Progress, ScanState};
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, State};
+use tauri::{Manager, State, Emitter};
+
+#[derive(Default)]
+struct PhoneServer(Mutex<Option<undertone_phone_sync::Server>>);
+#[tauri::command]
+async fn export_playlist(db: State<'_, Database>, playlist_id: i64, path: String) -> Result<String,String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        undertone::playlist_export::copy_playlist(&db, playlist_id, std::path::Path::new(&path))
+            .map(|folder|folder.to_string_lossy().into_owned())
+    }).await.map_err(|e|e.to_string())?
+}
+fn start_phone_server(path: std::path::PathBuf, app: tauri::AppHandle) -> Result<undertone_phone_sync::Server,String> {
+    let server=undertone_phone_sync::Server::start(path)?;
+    server.on_collections_change(move || {let _=app.emit("phone-collections-changed",());});
+    Ok(server)
+}
+#[tauri::command]
+fn phone_sync_status(server: State<'_, PhoneServer>) -> Option<undertone_phone_sync::Status> {
+    server.0.lock().unwrap().as_ref().map(|s|s.status())
+}
+#[tauri::command]
+async fn phone_sync_start(app: tauri::AppHandle, db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<undertone_phone_sync::Status,String> {
+    let mut running = server.0.lock().map_err(|_|"Phone server unavailable")?;
+    if running.is_none() { *running=Some(start_phone_server(db.path.clone(), app)?); }
+    undertone_phone_sync::Server::set_enabled(&db.path, true)?;
+    Ok(running.as_ref().unwrap().status())
+}
+#[tauri::command]
+fn phone_sync_stop(db: State<'_, Database>, server: State<'_, PhoneServer>) -> Result<(),String> { undertone_phone_sync::Server::set_enabled(&db.path, false)?; *server.0.lock().unwrap()=None; Ok(()) }
 
 #[tauri::command]
 async fn collections(
@@ -427,132 +458,26 @@ fn audio_meter(engine: State<'_, Arc<audio::Audio>>) -> audio::VisualizerLevels 
     engine.take_levels()
 }
 #[tauri::command]
-fn slskd_enabled() -> bool {
-    cfg!(all(feature = "slskd", target_os = "windows"))
+async fn update_media_session(app:tauri::AppHandle,db:State<'_,Database>,track_id:Option<i64>,playing:bool,position:f64)->Result<bool,String>{
+    #[cfg(target_os="windows")]
+    {
+        let db=db.inner().clone();
+        tauri::async_runtime::spawn_blocking(move||{app.state::<media_controls::MediaState>().update(&db,track_id,playing,position)}).await.map_err(|_|"Windows media session is unavailable".to_string())?
+    }
+    #[cfg(not(target_os="windows"))]
+    {let _=(app,db,track_id,playing,position);Ok(false)}
 }
 #[tauri::command]
 fn default_scan_folder() -> Option<&'static str> {
-    #[cfg(feature = "portable")]
-    { None }
-    #[cfg(not(feature = "portable"))]
-    { Some("F:\\Music") }
+    None
 }
-#[cfg(all(feature = "slskd", target_os = "windows"))]
-mod soulseek_commands {
-    use super::*;
-    use undertone::{providers::SecretStore, services::slskd};
-    #[cfg(not(feature = "portable"))]
-    use undertone::services::windows_secrets::WindowsSecretStore;
-    #[cfg(feature = "portable")]
-    use undertone::services::portable_secrets::PortableSecretStore;
-    fn secret_store(db:&Database)->Box<dyn SecretStore>{
-        #[cfg(feature = "portable")]
-        { Box::new(PortableSecretStore::new(db.path.parent().unwrap().to_path_buf())) }
-        #[cfg(not(feature = "portable"))]
-        { let _=db; Box::new(WindowsSecretStore) }
-    }
-    #[tauri::command]
-    pub async fn slskd_settings(db: tauri::State<'_, Database>) -> Result<slskd::Settings, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || slskd::settings(&db, secret_store(&db).as_ref()))
-            .await
-            .map_err(|_| "Не удалось прочитать настройки")?
-    }
-    #[tauri::command]
-    pub async fn slskd_save(
-        db: tauri::State<'_, Database>,
-        server_url: String,
-        api_key: Option<String>,
-    ) -> Result<slskd::Settings, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::save(&db, secret_store(&db).as_ref(), &server_url, api_key.as_deref())
-        })
-        .await
-        .map_err(|_| "Не удалось сохранить настройки")?
-    }
-    #[tauri::command]
-    pub async fn slskd_check(db: tauri::State<'_, Database>) -> Result<slskd::Connection, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || slskd::check_saved(&db, secret_store(&db).as_ref()))
-            .await
-            .map_err(|_| "Проверка соединения не завершилась")?
-    }
-    #[tauri::command]
-    pub async fn slskd_save_download_root(
-        db: tauri::State<'_, Database>,
-        download_root: Option<String>,
-    ) -> Result<(), String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::save_download_root(&db, download_root.as_deref())
-        })
-        .await
-        .map_err(|_| "Не удалось сохранить download root")?
-    }
-    #[tauri::command]
-    pub async fn slskd_search(
-        db: tauri::State<'_, Database>,
-        query: String,
-    ) -> Result<undertone::providers::SoulseekSearchResults, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::search_saved(&db, secret_store(&db).as_ref(), &query)
-        })
-        .await
-        .map_err(|_| "slskd: search failed")?
-    }
-    #[tauri::command]
-    pub async fn slskd_download_start(
-        db: tauri::State<'_, Database>,
-        request: undertone::providers::SoulseekDownloadRequest,
-    ) -> Result<undertone::providers::DownloadStatus, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::start_download_saved(&db, secret_store(&db).as_ref(), request)
-        })
-        .await
-        .map_err(|_| "slskd: download start failed")?
-    }
-    #[tauri::command]
-    pub async fn slskd_download_status(
-        db: tauri::State<'_, Database>,
-        operation_id: String,
-    ) -> Result<undertone::providers::DownloadStatus, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::download_status_saved(&db, secret_store(&db).as_ref(), &operation_id)
-        })
-        .await
-        .map_err(|_| "slskd: download status failed")?
-    }
-    #[tauri::command]
-    pub async fn slskd_download_cancel(
-        db: tauri::State<'_, Database>,
-        operation_id: String,
-    ) -> Result<undertone::providers::DownloadStatus, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::cancel_download_saved(&db, secret_store(&db).as_ref(), &operation_id)
-        })
-        .await
-        .map_err(|_| "slskd: download cancel failed")?
-    }
-    #[tauri::command]
-    pub async fn slskd_download_finalize(
-        db: tauri::State<'_, Database>,
-        operation_id: String,
-    ) -> Result<undertone::providers::DownloadFinalizeResult, String> {
-        let db = db.inner().clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            slskd::finalize_download_saved(&db, secret_store(&db).as_ref(), &operation_id)
-        })
-        .await
-        .map_err(|_| "slskd: finalize failed")?
-    }
-}
+
 fn main() {
+    let window_state=tauri_plugin_window_state::Builder::default().with_state_flags(tauri_plugin_window_state::StateFlags::SIZE|tauri_plugin_window_state::StateFlags::POSITION|tauri_plugin_window_state::StateFlags::MAXIMIZED);
+    #[cfg(feature="portable")]
+    let window_state=window_state.with_filename(std::env::current_exe().expect("executable path").parent().expect("executable directory").join("data/window-state.json").to_string_lossy().into_owned());
     let builder = tauri::Builder::default()
+        .plugin(window_state.build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
@@ -561,7 +486,11 @@ fn main() {
                 &std::env::current_exe()?,
             ).map_err(std::io::Error::other)?;
             let db = Database::open(&data_dir).map_err(std::io::Error::other)?;
+            let phone = if undertone_phone_sync::Server::enabled(&db.path) {
+                match start_phone_server(db.path.clone(), app.handle().clone()) { Ok(server)=>Some(server), Err(error)=>{eprintln!("Phone access could not restart: {error}");None} }
+            } else {None};
             app.manage(db);
+            app.manage(PhoneServer(Mutex::new(phone)));
             app.manage(undertone::bulk_lyrics::BulkLyricsJob::default());
             #[cfg(all(
                 feature = "external-lyrics",
@@ -573,16 +502,20 @@ fn main() {
             app.manage(Arc::new(Mutex::new(Progress::default())) as ScanState);
             app.manage(Arc::new(audio::Audio::new()));
             #[cfg(feature = "portable")]
-            {
+            let main_window={
                 let window = app.config().app.windows.first().ok_or("missing main window")?;
                 tauri::WebviewWindowBuilder::from_config(app.handle(), window)?
                     .data_directory(data_dir.join("webview2"))
-                    .build()?;
-            }
+                    .build()?
+            };
+            #[cfg(not(feature="portable"))]
+            let main_window=app.get_webview_window("main").ok_or("missing main window")?;
+            #[cfg(target_os="windows")]
+            app.manage(media_controls::MediaState::new(&main_window,&data_dir));
             Ok(())
         });
-    #[cfg(all(feature = "slskd", target_os = "windows"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        phone_sync_status, phone_sync_start, phone_sync_stop,
         library,
         track_metadata_details,
         playback_session,
@@ -597,9 +530,11 @@ fn main() {
         remove_library_folder,
         scan_folders,
         audio_command,
+        update_media_session,
         audio_meter,
         collections,
         collection_action,
+        export_playlist,
         track_lyrics,
         external_lyrics_enabled,
         fetch_track_lyrics,
@@ -610,48 +545,6 @@ fn main() {
         system_actions::copy_system_text,
         system_actions::copy_cover_image,
         system_actions::show_in_file_explorer,
-        slskd_enabled,
-        default_scan_folder,
-        soulseek_commands::slskd_settings,
-        soulseek_commands::slskd_save,
-        soulseek_commands::slskd_save_download_root,
-        soulseek_commands::slskd_check,
-        soulseek_commands::slskd_search,
-        soulseek_commands::slskd_download_start,
-        soulseek_commands::slskd_download_status,
-        soulseek_commands::slskd_download_cancel,
-        soulseek_commands::slskd_download_finalize
-    ]);
-    #[cfg(not(all(feature = "slskd", target_os = "windows")))]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        library,
-        track_metadata_details,
-        playback_session,
-        playback_playable_track_ids,
-        save_playback_session,
-        deleted_songs_settings,
-        save_deleted_songs_folder,
-        move_track_to_trash,
-        track_file_status,
-        remove_missing_track,
-        scan_status,
-        remove_library_folder,
-        scan_folders,
-        audio_command,
-        audio_meter,
-        collections,
-        collection_action,
-        track_lyrics,
-        external_lyrics_enabled,
-        fetch_track_lyrics,
-        start_bulk_lyrics_indexing,
-        bulk_lyrics_indexing_status,
-        bulk_lyrics_indexing_eligibility,
-        cancel_bulk_lyrics_indexing,
-        system_actions::copy_system_text,
-        system_actions::copy_cover_image,
-        system_actions::show_in_file_explorer,
-        slskd_enabled,
         default_scan_folder
     ]);
     #[allow(unused_mut)]
@@ -675,8 +568,8 @@ mod artwork_tests {
     }
     #[cfg(not(feature = "portable"))]
     #[test]
-    fn installed_build_keeps_default_music_folder() {
-        assert_eq!(default_scan_folder(), Some("F:\\Music"));
+    fn installed_build_waits_for_user_selected_music_folder() {
+        assert_eq!(default_scan_folder(), None);
     }
     #[test]
     fn cached_artwork_is_allowed_without_exposing_siblings() {

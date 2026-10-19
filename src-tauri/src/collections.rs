@@ -2,6 +2,22 @@ use crate::{database::Database, providers::TrackId};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
+/// Extended M3U uses UTF-8 and keeps playlist entries (including duplicates).
+pub fn export_m3u8(db: &Database, id: i64) -> Result<String, String> {
+    let conn = db.connect().map_err(error)?;
+    require_playlist(&conn, id)?;
+    let mut statement = conn.prepare("SELECT t.path,a.name,t.title,t.duration FROM playlist_tracks p JOIN tracks t ON t.id=p.track_id JOIN artists a ON a.id=t.artist_id WHERE p.playlist_id=?1 ORDER BY p.position,p.id").map_err(error)?;
+    let entries = statement.query_map([id], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,f64>(3)?))).map_err(error)?;
+    let mut output = String::from("#EXTM3U\n");
+    for entry in entries {
+        let (path,artist,title,duration) = entry.map_err(error)?;
+        if path.contains(['\r','\n']) { return Err("Путь к треку содержит перенос строки".into()); }
+        let label = format!("{artist} - {title}").replace(['\r','\n'], " ");
+        output.push_str(&format!("#EXTINF:{},{label}\n{path}\n", duration.round() as i64));
+    }
+    Ok(output)
+}
+
 #[derive(Serialize)]
 pub struct PlaylistEntry {
     pub id: i64,

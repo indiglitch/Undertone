@@ -40,16 +40,16 @@ test('new controls join near their default position without changing saved relat
 test('volume and visualizer remain single atomic controls and reset clears saved layout',()=>{
   assert.equal(defaultPlayerControlOrder.filter(id=>id==='volume').length,1);
   assert.equal(defaultPlayerControlOrder.filter(id=>id==='visualizer').length,1);
-  const player=source('./player.tsx'),strip=source('./PlayerControlStrip.tsx'),app=source('./App.tsx'),settings=source('./SoulseekSettings.tsx');
-  assert.match(player,/volume:<div className="volume-group"/);
-  assert.match(player,/visualizer:<MusicVisualizer/);
+  const player=source('./player.tsx'),strip=source('./PlayerControlStrip.tsx'),app=source('./App.tsx'),settings=source('./AppSettings.tsx');
+  assert.equal((player.match(/className="volume-group"/g)||[]).length,1);
+  assert.match(player,/run\(onVisualizer\)/);
   assert.match(strip,/order\.map\(id=><span key=\{id\}/);
   assert.match(strip,/setPointerCapture\(event.pointerId\)/);
   assert.match(strip,/onPointerCancel=/);
   assert.match(strip,/event.key==='Escape'/);
   assert.match(strip,/onClickCapture=\{event=>\{if\(suppressClick.current\)/);
-  assert.match(app,/function resetPlayerLayout\(\)\{setPlayerControlOrder\(resetPlayerControlOrder/);
-  assert.match(settings,/Reset player layout/);
+  assert.match(app,/function resetPlayerLayout\(\)\{[^}]*setPlayerControlOrder\(resetPlayerControlOrder/);
+  assert.match(settings,/Сбросить расположение/);
   const local=storage();savePlayerControlOrder(local,[...defaultPlayerControlOrder].reverse());
   assert.deepEqual(resetPlayerControlOrder(local),[...defaultPlayerControlOrder]);
   assert.equal(local.data.has(playerControlStorageKey),false);
@@ -64,6 +64,6 @@ test('reorder and reset touch only layout state and preserve playback state',()=
   resetPlayerControlOrder(local);
   assert.deepEqual(playback,snapshot);
   const app=source('./App.tsx');
-  assert.match(app,/function updatePlayerControlOrder\(order:PlayerControlId\[\]\)\{setPlayerControlOrder\(order\);savePlayerControlOrder/);
+  assert.match(app,/function updatePlayerControlPositions\(positions:PlayerControlPositions\)\{setPlayerControlPositions\(positions\);savePlayerControlPositions/);
   assert.doesNotMatch(app.slice(app.indexOf('function resetPlayerLayout'),app.indexOf('const sidebarDrag')),/player\.|audio_command|setNavigation/);
 });

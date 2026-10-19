@@ -1,0 +1,18 @@
+/* Phase 13 presentation contract. Gesture/reorder/autoscroll algorithms remain local. */
+:root { --drag-source-opacity:.55; --drag-valid:var(--accent-violet); --drag-invalid:var(--danger); --drag-insertion-width:2px; }
+.track-table .playlist-drag-source,.app-shell[data-drag-track-id] .track-row[data-global-drag-source=true] { opacity:var(--drag-source-opacity); }
+.app-shell.dragging-track [data-drag-target=valid] { outline:2px solid var(--drag-valid); outline-offset:-2px; background-color:var(--state-selected); }
+.app-shell.dragging-track [data-drag-target=invalid] { outline:2px solid var(--drag-invalid); outline-offset:-2px; cursor:not-allowed; }
+.track-table .track-row[data-insertion]::after { content:''; position:absolute; inset-inline:var(--space-2); height:var(--drag-insertion-width); background:var(--drag-valid); pointer-events:none; z-index:2; }
+.track-table .track-row[data-insertion=before]::after { top:0; }
+.track-table .track-row[data-insertion=after]::after { bottom:0; }
+.playlist-drag-ghost,.feedback-drag-ghost { position:fixed; z-index:300; display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2); pointer-events:none; background:var(--surface-secondary); border:var(--border-default); border-radius:var(--radius-sm); box-shadow:var(--shadow-popover); color:var(--text-primary); box-sizing:border-box; }
+.feedback-drag-ghost { width:240px; min-height:44px; }
+.feedback-drag-ghost > span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:var(--font-row-title); }
+.feedback-drag-ghost > small { flex:none; color:var(--text-secondary); font:var(--font-metadata); }
+.app-shell .playlist-reorder-handle,.settings-player-preview .player-control-strip:not(.is-locked) .player-control-item { cursor:grab; }
+.app-shell.dragging-track,.app-shell.dragging-track *,.track-table:has(.playlist-drag-source) .playlist-reorder-handle,.player-control-strip.is-dragging .player-control-item { cursor:grabbing; }
+.app-shell.dragging-track [data-drag-target=invalid] * { cursor:not-allowed; }
+.player-control-strip.is-dragging .is-source { background:var(--state-selected); outline:2px solid var(--drag-valid); opacity:var(--drag-source-opacity); }
+.player-control-strip[data-drop-valid=false] .is-source { outline-color:var(--drag-invalid); cursor:not-allowed; }
+@media(prefers-reduced-motion:reduce) { .track-table .playlist-drag-neighbor { transition:none; } }

@@ -4,6 +4,7 @@ pub mod audio;
 pub mod audio_source;
 pub mod bulk_lyrics;
 pub mod collections;
+pub mod playlist_export;
 pub mod database;
 pub mod external_lyrics;
 pub mod lyrics;
@@ -12,7 +13,6 @@ pub mod playback_session;
 pub mod data_paths;
 pub mod providers;
 pub mod scanner;
-pub mod services;
 pub mod trash;
 
 #[cfg(all(

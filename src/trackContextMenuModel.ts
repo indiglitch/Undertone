@@ -63,7 +63,9 @@ export function collectionActionLabels(kind:CollectionMenuKind){
 export const playlistTrackIds=<T extends {id:number}>(tracks:T[])=>tracks.map(track=>track.id);
 export const playlistAddAction=<T extends {id:number}>(playlistId:number,tracks:T[])=>({type:'add_tracks' as const,id:playlistId,track_ids:playlistTrackIds(tracks)});
 
-export function enqueueGroup<T>(tracks:T[],playNext:boolean,enqueue:(track:T,playNext:boolean)=>void){
+export function enqueueGroup<T>(tracks:T[],playNext:boolean,enqueue:(track:T,playNext:boolean)=>boolean|void){
   const ordered=playNext?[...tracks].reverse():tracks;
-  for(const track of ordered)enqueue(track,playNext);
+  let added=false;
+  for(const track of ordered){if(enqueue(track,playNext)===false)return false;added=true;}
+  return added;
 }

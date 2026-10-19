@@ -1,0 +1,31 @@
+/* Search composition owner. Canonical controls, TrackList and entities keep their styles. */
+.library-content.unified-search-page { max-width:none; padding:var(--space-4) var(--page-padding); gap:0; }
+.search-surface { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; width:100%; max-width:calc(var(--page-width) - 2 * var(--page-padding)); margin-inline:auto; gap:clamp(var(--space-3),1.25vw,var(--space-5)); }
+.search-page-heading.page-header { margin:0; gap:var(--space-3); }
+.search-page-heading .page-header-icon { width:var(--control-height); height:var(--control-height); flex-basis:var(--control-height); background:transparent; }
+.search-query-form { margin:0; flex-shrink:0; }
+.search-query-form .ds-search { max-width:1280px; }
+.search-query-form input.ds-input.ds-input { height:clamp(var(--control-height),2.5vw,var(--control-height-lg)); }
+.search-key-hint { font:var(--font-metadata); color:var(--text-muted); white-space:nowrap; }
+.search-surface > .ds-tabs { flex-shrink:0; align-self:flex-start; }
+.search-surface > .ds-tabs [role=tab] { padding-inline:var(--space-4); }
+.search-results-body { min-width:0; min-height:0; flex:1; }
+.search-results-grouped { overflow:auto; overscroll-behavior:contain; padding-right:var(--space-1); }
+.search-results-grouped > section { margin-bottom:var(--space-5); }
+.search-results-category { display:flex; flex-direction:column; overflow:hidden; gap:var(--space-2); }
+.search-group-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-2); }
+.search-group-heading h2 { font:var(--font-section-title); margin:0; }
+.search-group-heading h2 small { display:inline-block; margin-left:var(--space-2); font:var(--font-metadata); color:var(--text-muted); }
+.search-group-heading .ds-button { font:var(--font-secondary); color:var(--text-secondary); }
+.search-entity-preview { display:grid; grid-template-columns:repeat(auto-fit,224px); gap:var(--space-5); }
+.search-empty-query p,.search-empty-note,.search-category-count { margin:0; font:var(--font-secondary); color:var(--text-secondary); }
+.search-empty-query { max-width:880px; padding-top:var(--space-5); border-top:var(--border-default); }
+.search-empty-query > p { margin-bottom:var(--space-5); font:var(--font-body); }
+.search-recent-queries { list-style:none; margin:0; padding:0; display:grid; gap:var(--space-1); }
+.search-recent-queries li { display:flex; gap:var(--space-2); min-width:0; }
+.search-recent-queries li > .ds-button:first-child { justify-content:flex-start; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; text-align:left; }
+@container (max-width:900px) { .search-key-hint { display:none; } }
+
+.search-results-body.search-results-empty { flex:1; overflow:auto; }
+
+/* Reserve the active network panel across searching/result/error transitions. */

@@ -1,7 +1,31 @@
-.track-context-menu {
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
-  box-sizing: border-box;
-  overflow-y: auto;
-}
-.context-submenu>summary{display:flex;align-items:center;justify-content:space-between;min-height:40px;padding:8px 10px;border-radius:6px;cursor:pointer;list-style:none}.context-submenu>summary::-webkit-details-marker{display:none}.context-submenu>summary:hover{background:#ffffff0b}.context-submenu[open]>summary svg{transform:rotate(90deg)}.context-submenu>summary svg{transition-property:transform;transition-duration:120ms}.context-submenu>div{padding:3px 0 3px 12px}.context-submenu>div button{color:#bdcbb0}
+/* Sole ContextMenu and submenu presentation owner. Forty-pixel rows remain accessible. */
+.context-menu-layer { position:fixed; inset:0; z-index:10000; pointer-events:none; overflow:visible; }
+.track-context-menu,.context-submenu-panel { position:fixed; width:max-content; min-width:196px; max-width:min(320px,calc(100vw - 16px)); max-height:calc(100dvh - 16px); overflow:auto; box-sizing:border-box; padding:var(--space-1); border:var(--border-default); border-radius:var(--radius-sm); background:var(--surface-panel); color:var(--text-primary); box-shadow:var(--shadow-popover); pointer-events:auto; user-select:none; }
+.track-context-menu section + section { margin-top:var(--space-1); }
+.track-context-menu .context-menu-separated { padding-top:var(--space-1); border-top:var(--border-default); }
+.context-menu-heading { display:block; padding:var(--space-1) var(--space-2); color:var(--text-muted); font:var(--font-caption); font-weight:400; letter-spacing:.02em; }
+.context-menu-item,.context-submenu > summary { display:grid; grid-template-columns:var(--icon-sm) minmax(0,1fr) auto; align-items:center; gap:var(--space-2); width:100%; min-height:var(--control-height); padding:var(--space-1) var(--space-2); border:0; border-radius:calc(var(--radius-sm) - var(--space-1)); background:transparent; color:var(--text-primary); font:var(--font-secondary); font-weight:400; text-align:left; cursor:pointer; list-style:none; transition:background-color 120ms,color 120ms; }
+.context-menu-icon { display:flex; align-items:center; justify-content:center; color:var(--text-secondary); }
+.context-menu-label { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.context-menu-trailing { display:flex; align-items:center; justify-content:flex-end; color:var(--text-muted); font:var(--font-caption); }
+.context-menu-item:hover:not(:disabled),.context-submenu > summary:hover:not([aria-disabled=true]) { background:var(--state-hover); }
+.context-menu-item:focus-visible,.context-submenu > summary:focus-visible { outline:2px solid var(--focus); outline-offset:-2px; background:var(--state-selected); }
+.context-menu-item:active:not(:disabled),.context-submenu > summary:active:not([aria-disabled=true]) { background:var(--state-active); transform:none; }
+.context-menu-item:disabled,.context-submenu > summary[aria-disabled=true] { color:var(--text-muted); opacity:1; cursor:default; }
+.context-menu-item.destructive,.context-menu-item.destructive .context-menu-icon { color:var(--danger); }
+.context-submenu > summary::-webkit-details-marker { display:none; }
+.context-menu-layer .tooltip-anchor { display:block; width:100%; }
+.context-submenu-panel { z-index:2; }
+@media(prefers-reduced-motion:reduce) { .context-menu-item,.context-submenu > summary { transition:none; } }
+
+.context-menu-trailing kbd { font:inherit; color:inherit; }
+
+.context-menu-item:disabled .context-menu-icon { color:inherit; }
+.context-menu-item:hover:not(:disabled) .context-menu-icon { color:var(--text-primary); }
+
+.context-menu-item.destructive:hover:not(:disabled) .context-menu-icon { color:var(--danger); }
+.context-menu-item.destructive:disabled { color:var(--text-muted); }
+.context-menu-item.destructive:disabled .context-menu-icon { color:inherit; }
+
+.context-menu-icon svg { width:var(--icon-sm); height:var(--icon-sm); }
+.context-submenu[data-side=left][open] > summary .context-menu-trailing svg { transform:rotate(180deg); }

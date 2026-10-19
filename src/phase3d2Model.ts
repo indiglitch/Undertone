@@ -1,5 +1,3 @@
-export const detailsLayoutClass=(open:boolean)=>open?'details-open':'';
-
 export function stableRandomAlbumIds<T extends {album_id:number}>(albums:T[],previous:number[],reshuffle:boolean,count=6,random:()=>number=Math.random){
   const unique=[...new Map(albums.map(album=>[album.album_id,album])).values()];
   const available=new Set(unique.map(album=>album.album_id));

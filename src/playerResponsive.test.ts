@@ -1,24 +1,22 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
-
-const css=readFileSync(new URL('./playerResponsive.css',import.meta.url),'utf8');
+const css=readFileSync(new URL('./PlayerPresentation.css',import.meta.url),'utf8');
 const player=readFileSync(new URL('./player.tsx',import.meta.url),'utf8');
 const layout=readFileSync(new URL('./playerControlLayout.css',import.meta.url),'utf8');
-
-test('narrow player cannot shrink volume slider below its usable width',()=>{
-  assert.match(css,/\.volume-control input\[type=range\]\{[^}]*width:110px;[^}]*min-width:110px;[^}]*max-width:110px;[^}]*flex:0 0 110px/);
-  assert.match(css,/\.volume-control\{[^}]*flex:0 0 150px;[^}]*min-width:150px/);
-  assert.match(css,/\.volume-group\{[^}]*flex:0 0 190px;[^}]*width:190px;[^}]*min-width:190px/);
+test('volume retains a usable slider and remains visible on narrow desktop',()=>{
+ assert.match(css,/\.volume-control input\[type=range\][^}]*width:100px;[^}]*min-width:100px/);
+ assert.doesNotMatch(css,/\.volume-group[^}]*display:none/);
+ assert.doesNotMatch(css,/\.player-output[^}]*display:none/);
 });
-
-test('normal width keeps the preferred slider width near the previous control size',()=>{
-  assert.match(css,/width:110px/);
-  assert.match(player,/<div className="volume-group" onWheel=[\s\S]*?<div className="volume-control"><button[\s\S]*?<input aria-label="Громкость"/);
+test('controls use shared primitives while sliders keep forty pixel targets',()=>{
+ assert.match(player,/<IconButton/);assert.match(player,/variant="primary" size="lg"/);
+ assert.match(css,/\.player input\[type=range\][^}]*height:40px/);
+ assert.match(layout,/min-width:40px; min-height:40px/);
 });
-
-test('responsive priority prevents overflow before compressing volume',()=>{
-  assert.match(layout,/\.player \.player-control-strip \{[^}]*overflow-x: auto/);
-  assert.match(layout,/\.player-control-volume \{ width: 190px/);
-  assert.match(layout,/@media \(max-width: 1060px\)[^}]*\} \.player-control-visualizer \{ display: none/);
+test('custom strip keeps scroll and absolute geometry without a legacy override sheet',()=>{
+ assert.match(layout,/overflow-x:auto/);assert.match(layout,/position:absolute/);
+ const main=readFileSync(new URL('./main.tsx',import.meta.url),'utf8');
+ assert.doesNotMatch(main,/playerFreeLayout|playerPolish/);
+ assert.doesNotMatch(css,/!important/);
 });

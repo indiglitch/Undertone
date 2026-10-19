@@ -1,6 +1,6 @@
 [package]
 name = "undertone"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 default-run = "undertone"
 
@@ -8,6 +8,7 @@ default-run = "undertone"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+undertone-phone-sync = { path = "../phone-sync" }
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
@@ -19,15 +20,14 @@ walkdir = "2"
 sha2 = "0.10"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 rubato = "0.16.2"
-url = "2"
 ort = { version = "2.0.0-rc.13", optional = true }
 tokenizers = { version = "0.23.2", optional = true, default-features = false, features = ["onig"] }
+tauri-plugin-window-state = "2"
 
 [features]
 default = ["ai"]
 ai = ["dep:ort", "dep:tokenizers"]
 portable = ["tauri/custom-protocol"]
-slskd = ["dep:reqwest", "dep:windows-sys"]
 external-lyrics = ["dep:reqwest"]
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
@@ -35,8 +35,9 @@ reqwest = { version = "0.13.4", optional = true, default-features = false, featu
 tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", optional = true, features = ["Win32_Security_Credentials", "Win32_Foundation"] }
 arboard = { version = "3.6", default-features = false, features = ["image-data"] }
+souvlaki = "0.8.3"
+windows = { version = "0.44", features = ["Win32_System_WinRT", "Media_Control", "Foundation_Collections"] }
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
@@ -48,3 +49,11 @@ symphonia-bundle-mp3 = { path = "vendor/symphonia-bundle-mp3" }
 [profile.release]
 strip = true
 lto = "thin"
+
+[[example]]
+name = "phase4b_smoke"
+required-features = ["ai"]
+
+[[example]]
+name = "phase4b2_evaluation"
+required-features = ["ai"]

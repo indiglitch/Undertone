@@ -1,0 +1,33 @@
+/* Small music-zine gestures, paired with the existing compact interaction model. */
+.signature-code, .signature-side, .section-index { font-family: ui-monospace,Consolas,monospace; font-size: 10px; letter-spacing: .08em; }
+.section-index { display: inline-block; color: var(--accent-violet); margin-right: 10px; font-size: 11px; font-weight: 400; }
+.signal-mark { width: 100%; height: 100%; color: var(--accent-violet); stroke: currentColor; stroke-width: 1.2; }
+.collection-signature { position: relative; display: flex; flex-direction: column; justify-content: space-between; width: 100%; height: 100%; padding: 10px; background: #ad7dff09; border: 1px solid #ad7dff24; border-radius: 3px 18px 3px 18px; overflow: hidden; }
+.signature-code, .signature-side { font-size: 8px; color: var(--text-muted); position: relative; z-index: 1; }
+.collection-signature .signal-mark { height: 65%; }
+.library-content[data-collection-kind=library] > .library-heading .page-header-icon { width: 84px; height: 84px; flex-basis: 84px; background: transparent; border-radius: 0; }
+.collection-tabs { gap: 2px; padding-bottom: 8px; border-bottom: 1px solid #ffffff0a; }
+.collection-tabs button { position: relative; background: transparent; border-radius: 0; padding-inline: 14px; transition: color 160ms, background-color 160ms; }
+.collection-tabs button[aria-current=page] { background: transparent; color: var(--accent-violet); }
+.collection-tabs button::after { content: ''; position: absolute; bottom: 0; left: 14px; right: 14px; height: 2px; background: var(--accent-violet); transform: scaleX(0); transform-origin: left; transition: transform 180ms; }
+.collection-tabs button[aria-current=page]::after, .collection-tabs button:hover::after { transform: scaleX(1); }
+.is-playing .signal-orbit { animation: record-turn 24s linear infinite; }
+.is-playing .signal-dot { animation: signal-beat 1600ms ease-in-out infinite alternate; }
+.app-shell[data-interacted=true] .library-heading { animation: zine-enter 240ms ease-out both; }
+@keyframes zine-enter { from { opacity: 0; translate: 0 5px; } to { opacity: 1; translate: 0 0; } }
+@keyframes record-turn { to { rotate: 360deg; } }
+@keyframes signal-beat { from { opacity: .5; scale: .9; } to { opacity: 1; scale: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .library-content *, .signal-mark * { animation: none !important; transition: none !important; }
+}
+/* Give desktop information the full content area, with a compact command row. */
+.library-content .collection-tabs { margin-bottom: 12px; padding-bottom: 4px; }
+.library-content[data-collection-kind=library] > .library-heading .page-header-icon { width: 56px; height: 56px; flex-basis: 56px; }
+.library-content[data-collection-kind=library] .collection-signature { padding: 5px; }
+.library-content[data-collection-kind=library] .signature-code, .library-content[data-collection-kind=library] .signature-side { font-size: 6px; }
+.library-heading .page-header-actions .library-toolbar { margin: 0; gap: 10px; }
+.playlist-filter { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; margin-bottom: 12px; background: #ffffff04; border: 1px solid #ffffff0c; border-radius: 8px; flex-shrink: 0; }
+.playlist-filter > svg { color: var(--accent-violet); flex-shrink: 0; }
+.playlist-filter input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; height: 40px; font-size: 13px; }
+.playlist-filter:focus-within { border-color: var(--accent-violet); }
+.playlist-filter small { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
