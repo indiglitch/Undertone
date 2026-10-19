@@ -45,3 +45,15 @@ Commit/run URL в архив не включены. Результаты отн�
 19.10.2026 повторены 4 Python-теста и синтаксические проверки YAML/всех 9 Bash run-шагов; diff --check успешен. Сохранены остальные UI test methods и 7 smoke screenshot checkpoints. Дополнительно устранён глобальный поиск Midnight city в проверке playlist membership: ожидаемое отсутствие проверяется в списке коллекции, а сохранение mini-player — отдельно. Assertions не отключались; лимиты CI не увеличивались.
 
 По дополнительному запросу пользователя добавлен общий iOS Share Original с читаемым именем и побайтовой временной копией, без изменения исходника/протокола. Пять OriginalFileExportTests добавлены, но не выполнялись. В следующем полном run проверить их наряду с исправлениями UI. Ни новый успешный build, ни новый успешный XCTest run пока не подтверждены. Commit/push ожидают подтверждения пользователя.
+
+## Повторный run #39196789513 — build failure
+
+После подтверждения отправлен commit `7e52929b1867f84d58af56da5553e7d68ef4d797` на `main`; [полный workflow](https://github.com/indiglitch/Undertone/actions/runs/39196789513) запущен вручную и завершился failure. Xcode 26.6 (17F113), iOS 26.5; primary iPhone 16e запустился, secondary выбран iPhone 16 Pro Max. Новое CLI-исключение тестов отсутствует: pinned-PC test теперь обнаруживается XCTest и должен использовать существующий XCTSkip без fixture.
+
+Ошибка build.log: `ios/Tests/OriginalFileExportTests.swift:56:32: Expected expression after 'unsafe'`. Новая переменная `unsafe` конфликтует с синтаксисом toolchain; локально переименована в `exportedName`. Assertions и expected values сохранены. Это исходниковое исправление; успешная повторная компиляция не подтверждена.
+
+**Тестов выполнено: 0.** Нет результатов XCTest passed/failed/skipped. Primary unit/UI и secondary smoke — два skipped **шага GitHub Actions**, а не skipped test cases. Следовательно, ни пять Share Original tests, ни три smoke не проверены этим run. Скриншоты и Primary/Secondary.xcresult не созданы.
+
+Единственный [artifact ios-simulator-results](https://github.com/indiglitch/Undertone/actions/runs/39196789513/artifacts/12162695596), 49 385 bytes, содержит Build.xcresult, build/project-generation logs, project targets, Xcode/SDK/device inventory и SHA/run URL. SHA-256 скачанного архива: `de6307044672f5dc28cb267b3c2bf47afbeaf54422f90c57b8a95604e42a8871`. Логи workflow также изучены. Остались прежние warnings PCDiscovery; они не причина этого compile failure.
+
+Локальное исправление теста и обновления отчёта не закоммичены/не отправлены. До следующего push требуется новое подтверждение пользователя; после отправки нужен полный workflow на новом SHA.

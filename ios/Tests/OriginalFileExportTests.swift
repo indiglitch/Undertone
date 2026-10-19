@@ -51,9 +51,9 @@ final class OriginalFileExportTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: second.url), try Data(contentsOf: source))
     }
     func testNamesAreSafePortableAndKeepUnicodeAndExtension() {
-        let unsafe = OriginalFileExport.filename(for: song(title: "../夜: Song\n?", artist: "A/B\\C", filename: "hash.FLAC"))
-        XCTAssertEqual(unsafe, "A_B_C — .._夜_ Song__.FLAC")
-        XCTAssertEqual((unsafe as NSString).lastPathComponent, unsafe)
+        let exportedName = OriginalFileExport.filename(for: song(title: "../夜: Song\n?", artist: "A/B\\C", filename: "hash.FLAC"))
+        XCTAssertEqual(exportedName, "A_B_C — .._夜_ Song__.FLAC")
+        XCTAssertEqual((exportedName as NSString).lastPathComponent, exportedName)
         XCTAssertEqual(OriginalFileExport.filename(for: song(title: "CON", artist: "")), "_CON.mp3")
         XCTAssertEqual(OriginalFileExport.filename(for: song(title: "", artist: "", filename: "original.ogg")), "original.ogg")
         XCTAssertEqual(OriginalFileExport.filename(for: song(title: "...", artist: "")), "Track.mp3")
